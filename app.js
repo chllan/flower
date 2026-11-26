@@ -357,3 +357,9 @@ window.addEventListener('storage', event => {
   if (!$('review').hidden) classify();
 });
 load();
+function candidates(text) {
+  return split(text).flatMap(line => {
+    const match = nameLookup.get(key(line));
+    return match ? [match] : [];
+  });
+}
