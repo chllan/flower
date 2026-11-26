@@ -363,3 +363,81 @@ function candidates(text) {
     return match ? [match] : [];
   });
 }
+async function recognize(files) {
+  const api = await loadOCR();
+  const worker = await api.createWorker('chi_tra+eng', 1, {
+    workerPath: 'https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/worker.min.js',
+  });
+
+  const results = [];
+  let failed = 0;
+
+  try {
+    await worker.setParameters({ tessedit_pageseg_mode: '7' });
+
+    for (const [index, file] of files.entries()) {
+      $('progress').textContent =
+        '正在辨識第 ' + (index + 1) + ' / ' + files.length + ' 張截圖…';
+
+      const url = URL.createObjectURL(file);
+
+      try {
+        const photo = new Image();
+        photo.src = url;
+        await photo.decode();
+
+        const scaleX = photo.naturalWidth / 706;
+        const scaleY = photo.naturalHeight / 1536;
+
+        const canvas = document.createElement('canvas');
+        canvas.width = 720;
+        canvas.height = 120;
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+
+        for (const y of [750, 1020, 1290]) {
+          for (const x of [47, 265, 484]) {
+            ctx.fillStyle = '#fff';
+            ctx.fillRect(0, 0, 720, 120);
+
+            ctx.drawImage(
+              photo,
+              x * scaleX, y * scaleY, 174 * scaleX, 29 * scaleY,
+              12, 2, 696, 116
+            );
+
+            const pixels = ctx.getImageData(0, 0, 720, 120);
+            const data = pixels.data;
+            const brightness = i =>
+              0.2126 * data[i] + 0.7152 * data[i + 1] + 0.0722 * data[i + 2];
+
+            const samples = [20, 32, 687, 699].map(column =>
+              brightness((60 * 720 + column) * 4)
+            );
+            const background = samples.reduce((sum, n) => sum + n, 0) / samples.length;
+
+            // 灰暗的卡片通常是尚未解鎖的花。
+            if (background < 145) continue;
+
+            const cutoff = background + (255 - background) * 0.45;
+            for (let i = 0; i < data.length; i += 4) {
+              const value = brightness(i) > cutoff ? 0 : 255;
+              data[i] = data[i + 1] = data[i + 2] = value;
+            }
+            ctx.putImageData(pixels, 0, 0);
+
+            const { data: recognized } = await worker.recognize(canvas);
+            if (recognized.text.trim()) results.push(recognized.text.trim());
+          }
+        }
+      } catch {
+        failed++;
+      } finally {
+        URL.revokeObjectURL(url);
+      }
+    }
+  } finally {
+    await worker.terminate();
+  }
+
+  return { text: results.join('\n'), failed };
+}
