@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="管理及查詢遊戲好友擁有的花種">
+<title>好友花種圖鑑</title>
+<link rel="stylesheet" href="./style.css"><script defer src="./seed.js"></script><script defer src="./app.js"></script>
+</head>
+<body>
+<header class="top"><div class="wrap brand"><span class="mark" aria-hidden="true">✿</span><span>好友花種圖鑑</span></div></header>
+<main class="wrap">
+  <section class="intro"><h1>好友花種圖鑑</h1><p>查找好友的花種，或上傳遊戲截圖更新收藏。</p>
+    <div class="stats"><div><strong id="friend-count">—</strong> 位好友</div><div><strong id="flower-count">—</strong> 個花種</div><div><strong id="record-count">—</strong> 筆持有紀錄</div></div>
+  </section>
+  <nav aria-label="花冊功能"><button type="button" data-view="catalog" aria-current="page">花種總覽</button><button type="button" data-view="editor">新增／更新好友</button></nav>
+  <div class="actions" style="margin-bottom:14px">
+    <button type="button" id="export-backup">匯出好友備份</button>
+    <button type="button" id="import-backup">匯入好友備份</button>
+    <input type="file" id="backup-file" accept=".json,application/json" hidden>
+  </div>
+  <p id="connection" role="status">正在載入花冊…</p>
+  <section id="catalog" class="page" hidden>
+    <div class="tools">
+      <label>搜尋花名<input id="search" type="search" placeholder="例如：滿天星"></label>
+      <label>篩選好友<select id="filter"><option value="">所有好友</option></select></label>
+      <label>顯示方式<select id="layout"><option value="list">持有人清單</option><option value="matrix">好友持有矩陣</option></select></label>
+    </div>
+    <div class="results"><p id="summary"></p><div class="pages"><button id="prev" type="button">上一頁</button><span id="page-number"></span><button id="next" type="button">下一頁</button></div></div>
+    <div class="table-frame" tabindex="0" aria-label="花種及好友持有紀錄"><table id="inventory"></table></div>
+  </section>
+  <section id="editor" class="page" hidden>
+    <form id="entry">
+      <div class="tools"><label>選擇好友<select id="friend"><option value="">新增好友</option></select></label>
+      <label id="new-field">新好友名稱<input id="new-friend" maxlength="80" placeholder="輸入遊戲暱稱"></label></div>
+      <div class="upload"><label for="screenshots">上傳遊戲截圖</label><p>可選多張圖片。請確認截圖中顯示清楚的花名。</p><input type="file" id="screenshots" accept="image/*" multiple>
+      <div id="previews" class="previews"></div></div>
+      <label for="manual">手動輸入花名（選填）</label>
+      <textarea id="manual" rows="3" placeholder="每行一個花名，也可用頓號分隔"></textarea>
+      <button class="primary" id="review-button">前往確認</button>
+      <p id="progress" role="status"></p>
+    </form>
+    <section id="review" hidden>
+      <h2>確認花名</h2><p id="target"></p><div id="review-images" class="previews"></div>
+      <div id="review-rows"></div>
+      <button type="button" id="add-row">新增一列</button>
+      <details id="ocr-details" hidden><summary>查看原始辨識文字</summary><pre id="ocr-raw"></pre></details>
+      <p id="review-message" role="status"></p>
+      <div class="actions"><button type="button" id="back">返回上傳</button><button class="primary" type="button" id="save">確認並儲存</button></div>
+    </section>
+  </section>
+</main>
+</body>
+</html>
