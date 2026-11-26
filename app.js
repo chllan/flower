@@ -165,22 +165,81 @@ function loadOCR() {
   return ocrLibrary;
 }
 function candidates(text) {
-  const known = [...nameLookup].filter(([name]) => name.length >= 2).sort((a,b) => b[0].length-a[0].length);
   return split(text).flatMap(line => {
-    let remaining = key(line);
-    const matches = [];
-    for (const [name, original] of known) {
-      if (remaining.includes(name)) {
-        matches.push(original);
-        remaining = remaining.replaceAll(name,'|');
+    const match = nameLookup.get(key(line));
+    return match ? [match] : [];
+  });
+}
+async function screenshotLabels(file) {
+  const url = URL.createObjectURL(file);
+  try {
+    const image = new Image();
+    image.src = url;
+    await image.decode();
+    const ratio = image.naturalWidth / image.naturalHeight;
+    if (ratio < 0.44 || ratio > 0.48) return null;
+    // Find the lower edge of the brown sort selector to align both layouts.
+    const guide = document.createElement('canvas');
+    guide.width = 1;
+    guide.height = 120;
+    const guideCtx = guide.getContext('2d');
+    guideCtx.drawImage(image, 622/706*image.naturalWidth, 420/1536*image.naturalHeight,
+      6/706*image.naturalWidth, 120/1536*image.naturalHeight, 0, 0, 1, 120);
+    const guidePixels = guideCtx.getImageData(0,0,1,120).data;
+    let run = 0;
+    let bestRun = 0;
+    let selectorBottom = 516;
+    for (let row = 0; row < 120; row++) {
+      const offset = row * 4;
+      const red = guidePixels[offset], green = guidePixels[offset+1], blue = guidePixels[offset+2];
+      const brown = red >= 126 && red <= 182 && red-green >= 6 && red-green <= 38 &&
+        green-blue >= 4 && green-blue <= 36;
+      run = brown ? run+1 : 0;
+      if (run > bestRun) {
+        bestRun = run;
+        selectorBottom = 420 + row;
       }
     }
-    for (const piece of remaining.split('|')) {
-      const cleaned = piece.replace(/[^\p{Script=Han}]/gu,'');
-      if (cleaned.length >= 2 && cleaned.length <= 24) matches.push(matches.length === 0 ? line.trim().slice(0,80) : cleaned);
+    const shift = bestRun >= 18 ? selectorBottom - 516 : 0;
+    const labels = [];
+    const sample = document.createElement('canvas');
+    sample.width = 176;
+    sample.height = 19;
+    const ctx = sample.getContext('2d', {willReadFrequently:true});
+    for (const baseY of [755,1025,1295]) {
+      const y = baseY + shift;
+      for (const x of [48,266,485]) {
+        ctx.drawImage(image, x/706*image.naturalWidth, y/1536*image.naturalHeight,
+          176/706*image.naturalWidth, 19/1536*image.naturalHeight, 0, 0, 176, 19);
+        const pixels = ctx.getImageData(0,0,176,19).data;
+        const luminance = offset => .2126*pixels[offset]+.7152*pixels[offset+1]+.0722*pixels[offset+2];
+        const sides = [3, 9, 165, 171].map(column => luminance((9*176+column)*4));
+        if (sides.reduce((sum,n) => sum+n,0)/sides.length < 145) continue;
+        const label = document.createElement('canvas');
+        label.width = 742;
+        label.height = 116;
+        const output = label.getContext('2d');
+        output.fillStyle = '#fff';
+        output.fillRect(0,0,label.width,label.height);
+        output.drawImage(image, x/706*image.naturalWidth, (y-3)/1536*image.naturalHeight,
+          176/706*image.naturalWidth, 25/1536*image.naturalHeight, 19, 8, 704, 100);
+        const crop = output.getImageData(19,8,704,100);
+        const rgb = crop.data;
+        const base = sides.reduce((sum,n) => sum+n,0)/sides.length;
+        const cutoff = base + (255-base)*0.32;
+        for (let offset = 0; offset < rgb.length; offset += 4) {
+          const luminance = .2126*rgb[offset]+.7152*rgb[offset+1]+.0722*rgb[offset+2];
+          const value = luminance > cutoff ? 0 : 255;
+          rgb[offset] = rgb[offset+1] = rgb[offset+2] = value;
+        }
+        output.putImageData(crop,19,8);
+        labels.push(label);
+      }
     }
-    return matches;
-  });
+    return labels;
+  } finally {
+    URL.revokeObjectURL(url);
+  }
 }
 async function recognize(files) {
   const api = await loadOCR();
@@ -196,12 +255,15 @@ async function recognize(files) {
       });
       if (cancelled) await worker.terminate();
     })(), new Promise((_,reject) => {timeout = setTimeout(() => { cancelled = true; reject(new Error('OCR 逾時')); },90000);})]);
-    await worker.setParameters({tessedit_pageseg_mode:'11'});
     for (const [i,file] of files.entries()) {
       $('progress').textContent = '正在辨識第 ' + (i+1) + ' / ' + files.length + ' 張截圖…';
       try {
-        const {data} = await worker.recognize(file);
-        results.push(data.text);
+        const labels = await screenshotLabels(file);
+        await worker.setParameters({tessedit_pageseg_mode:labels ? '7' : '11'});
+        for (const input of labels || [file]) {
+          const {data} = await worker.recognize(input);
+          results.push(data.text);
+        }
       } catch {failed++;}
     }
     return {text:results.join('\n'), failed};
@@ -235,7 +297,8 @@ $('entry').onsubmit = async event => {
       const result = await recognize(files);
       raw = result.text;
       if (result.failed) message = result.failed + ' 張截圖辨識失敗，請參照原圖補上。';
-      else if (!candidates(raw).length) message = '沒有辨識到可用的花名，請參照原圖手動輸入。';
+      else if (!candidates(raw).length) message = '沒有辨識到與圖鑑相符的花名，請參照原圖手動輸入。';
+      else message = '已列出與圖鑑相符的花名。請確認好友確實擁有，漏掉或全新的花可以手動新增。';
     } catch { message = '這次無法辨識截圖，請參照原圖手動輸入，或返回重試。'; }
   }
   const names = [...new Set([...manual,...candidates(raw)].map(canonical))];
@@ -273,7 +336,9 @@ $('save').onclick = async () => {
   $('save').disabled = $('back').disabled = true;
   $('review-message').textContent = '正在儲存…';
   try {
-    saveRecords([{friend:target,flower:''}, ...additions.map(flower => ({friend:target,flower}))]);
+    const records = [{friend:target,flower:''}, ...additions.map(flower => ({friend:target,flower}))];
+    await publishRecords(records);
+    try { saveRecords(records); } catch { /* Shared data was already committed. */ }
     merge(target,additions);
     $('entry').reset();
     imageURLs.forEach(URL.revokeObjectURL);
@@ -312,7 +377,7 @@ function load(message = '') {
   friends = [...seed.friends];
   flowers = new Map(Object.entries(seed.flowers).map(([name,f]) => [name,{grade:f.grade,owners:new Set(f.owners)}]));
   try {
-    for (const {friend,flower} of readRecords()) merge(friend,[flowerAlias(flower)]);
+    for (const {friend,flower} of combinedRecords(sharedRecords, readRecords())) merge(friend,[flowerAlias(flower)]);
     connection.textContent = message || (friends.length ? '' : '第一次使用時，可以匯入好友備份或新增好友。');
   } catch {
     connection.textContent = '目前無法讀取瀏覽器的花冊資料。';
@@ -323,7 +388,7 @@ function load(message = '') {
 }
 $('export-backup').onclick = () => {
   try {
-    const file = new Blob([JSON.stringify({version:1,records:readRecords()})],{type:'application/json'});
+    const file = new Blob([JSON.stringify({version:1,records:combinedRecords(sharedRecords,readRecords())})],{type:'application/json'});
     const url = URL.createObjectURL(file);
     const link = make('a');
     link.href = url;
@@ -356,88 +421,121 @@ window.addEventListener('storage', event => {
   load();
   if (!$('review').hidden) classify();
 });
-load();
-function candidates(text) {
-  return split(text).flatMap(line => {
-    const match = nameLookup.get(key(line));
-    return match ? [match] : [];
-  });
+
+const sharedApi = 'https://api.github.com/repos/chllan/flower/contents/flower-shared-data.json';
+let sharedRecords = [];
+let sharedRevision = 0;
+let sharedWriting = false;
+
+function combinedRecords(...sources) {
+  const records = new Map();
+  for (const source of sources) {
+    for (const row of source) {
+      const normalized = {friend:exact(row.friend),flower:flowerAlias(exact(row.flower))};
+      records.set(JSON.stringify([normalized.friend,normalized.flower]),normalized);
+    }
+  }
+  return [...records.values()];
 }
-async function recognize(files) {
-  const api = await loadOCR();
-  const worker = await api.createWorker('chi_tra+eng', 1, {
-    workerPath: 'https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/worker.min.js',
-  });
 
-  const results = [];
-  let failed = 0;
+function parseShared(data) {
+  if (data?.version !== 1 || !Array.isArray(data.records) ||
+      data.records.some(row => typeof row?.friend !== 'string' ||
+        !row.friend.trim() || row.friend.length > 80 ||
+        typeof row.flower !== 'string' || row.flower.length > 80)) {
+    throw new Error('共用資料的格式有誤。');
+  }
+  return data.records;
+}
 
+async function refreshShared() {
+  if (sharedWriting) return;
+  const revision = sharedRevision;
   try {
-    await worker.setParameters({ tessedit_pageseg_mode: '7' });
+    const response = await fetch('https://raw.githubusercontent.com/chllan/flower/main/flower-shared-data.json',
+      {cache:'no-store', signal:AbortSignal.timeout(12000)});
+    if (revision !== sharedRevision || sharedWriting) return;
+    if (response.status === 404) {
+      $('shared-status').textContent = '共用花冊等待管理者首次發布。';
+      return;
+    }
+    if (!response.ok) throw new Error();
+    const records = parseShared(await response.json());
+    if (revision !== sharedRevision || sharedWriting) return;
+    if (JSON.stringify(records) !== JSON.stringify(sharedRecords)) {
+      sharedRecords = records;
+      load();
+      if (!$('review').hidden) classify();
+    }
+    $('shared-status').textContent = '已載入共用花冊。';
+  } catch {
+    $('shared-status').textContent = '暫時無法讀取共用花冊，稍後會再試。';
+  }
+}
 
-    for (const [index, file] of files.entries()) {
-      $('progress').textContent =
-        '正在辨識第 ' + (index + 1) + ' / ' + files.length + ' 張截圖…';
+function encodeShared(records) {
+  const bytes = new TextEncoder().encode(JSON.stringify({version:1,records}));
+  let binary = '';
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary);
+}
 
-      const url = URL.createObjectURL(file);
-
-      try {
-        const photo = new Image();
-        photo.src = url;
-        await photo.decode();
-
-        const scaleX = photo.naturalWidth / 706;
-        const scaleY = photo.naturalHeight / 1536;
-
-        const canvas = document.createElement('canvas');
-        canvas.width = 720;
-        canvas.height = 120;
-        const ctx = canvas.getContext('2d', { willReadFrequently: true });
-
-        for (const y of [750, 1020, 1290]) {
-          for (const x of [47, 265, 484]) {
-            ctx.fillStyle = '#fff';
-            ctx.fillRect(0, 0, 720, 120);
-
-            ctx.drawImage(
-              photo,
-              x * scaleX, y * scaleY, 174 * scaleX, 29 * scaleY,
-              12, 2, 696, 116
-            );
-
-            const pixels = ctx.getImageData(0, 0, 720, 120);
-            const data = pixels.data;
-            const brightness = i =>
-              0.2126 * data[i] + 0.7152 * data[i + 1] + 0.0722 * data[i + 2];
-
-            const samples = [20, 32, 687, 699].map(column =>
-              brightness((60 * 720 + column) * 4)
-            );
-            const background = samples.reduce((sum, n) => sum + n, 0) / samples.length;
-
-            // 灰暗的卡片通常是尚未解鎖的花。
-            if (background < 145) continue;
-
-            const cutoff = background + (255 - background) * 0.45;
-            for (let i = 0; i < data.length; i += 4) {
-              const value = brightness(i) > cutoff ? 0 : 255;
-              data[i] = data[i + 1] = data[i + 2] = value;
-            }
-            ctx.putImageData(pixels, 0, 0);
-
-            const { data: recognized } = await worker.recognize(canvas);
-            if (recognized.text.trim()) results.push(recognized.text.trim());
-          }
-        }
-      } catch {
-        failed++;
-      } finally {
-        URL.revokeObjectURL(url);
+async function publishRecords(extra = []) {
+  const token = $('shared-token').value.trim();
+  if (!token) throw new Error('請先在「管理共用花冊」輸入 GitHub 更新權杖。');
+  if (sharedWriting) throw new Error('正在發布，請稍候。');
+  sharedWriting = true;
+  const publishButton = $('publish-shared');
+  publishButton.disabled = true;
+  const headers = {Authorization:'Bearer ' + token, Accept:'application/vnd.github+json'};
+  try {
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const current = await fetch(sharedApi + '?ref=main', {headers,cache:'no-store',signal:AbortSignal.timeout(15000)});
+      let remote = [];
+      let sha;
+      if (current.ok) {
+        const file = await current.json();
+        sha = file.sha;
+        const binary = atob(file.content);
+        remote = parseShared(JSON.parse(new TextDecoder().decode(Uint8Array.from(binary,c => c.charCodeAt(0)))));
+      } else if (current.status !== 404) {
+        throw new Error('無法讀取 GitHub 資料，請確認權杖和 repo 權限。');
       }
+      const records = combinedRecords(remote,readRecords(),extra);
+      const response = await fetch(sharedApi, {
+        method:'PUT',
+        headers:{...headers,'Content-Type':'application/json'},
+        signal:AbortSignal.timeout(20000),
+        body:JSON.stringify({message:'Update shared flower inventory',branch:'main',sha,content:encodeShared(records)}),
+      });
+      if (response.ok) {
+        sharedRevision++;
+        sharedRecords = records;
+        $('shared-status').textContent = '已發布共用花冊。';
+        return;
+      }
+      if (attempt === 0 && [409,422].includes(response.status)) continue;
+      throw new Error('GitHub 儲存失敗（' + response.status + '）。請確認權杖有 Contents 的 Read and write 權限。');
     }
   } finally {
-    await worker.terminate();
+    sharedWriting = false;
+    publishButton.disabled = false;
   }
-
-  return { text: results.join('\n'), failed };
 }
+
+$('publish-shared').onclick = async () => {
+  const status = $('shared-admin-status');
+  status.textContent = '正在發布…';
+  try {
+    await publishRecords();
+    load('已發布目前的好友資料。');
+    if (!$('review').hidden) classify();
+    status.textContent = '發布完成。';
+  } catch (error) {
+    status.textContent = error.message || '發布失敗，請重試。';
+  }
+};
+load();
+refreshShared();
+setInterval(() => { if (!document.hidden) refreshShared(); }, 60000);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshShared(); });
