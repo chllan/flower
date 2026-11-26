@@ -5,6 +5,15 @@
 <meta name="description" content="管理及查詢遊戲好友擁有的花種">
 <title>好友花種圖鑑</title>
 <link rel="stylesheet" href="./style.css"><script defer src="./seed.js"></script><script defer src="./app.js"></script>
+<script defer src="./flower-cards.js"></script>
+<style>
+.flower-card-button{display:inline-flex;vertical-align:middle;padding:0;margin:0 8px 0 0;border-radius:8px;overflow:hidden;background:#f1f6ee;line-height:0}
+.flower-card-button img{width:42px;height:42px;object-fit:cover}
+.flower-card-dialog{width:min(370px,calc(100vw - 32px));padding:16px;border:1px solid #dce4db;border-radius:15px;color:#243a30;text-align:center}
+.flower-card-dialog::backdrop{background:#0f1e18a0}
+.flower-card-dialog img{display:block;width:min(100%,280px);height:auto;margin:0 auto 12px;border-radius:10px;image-rendering:auto}
+.flower-card-dialog h2{margin:0 0 12px;font-size:1.1rem}
+</style>
 </head>
 <body>
 <header class="top"><div class="wrap brand"><span class="mark" aria-hidden="true">✿</span><span>好友花種圖鑑</span></div></header>
