@@ -4,7 +4,7 @@
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="description" content="管理及查詢遊戲好友擁有的花種">
 <title>好友花種圖鑑</title>
-<link rel="stylesheet" href="./style.css"><script defer src="./seed.js"></script><script defer src="./app.js"></script>
+<link rel="stylesheet" href="./style.css"><script defer src="./seed.js"></script><script defer src="./app.js?v=friend-management-1"></script>
 <script defer src="./flower-cards.js"></script>
 <style>
 .flower-card-button{display:inline-flex;vertical-align:middle;padding:0;margin:0 8px 0 0;border-radius:8px;overflow:hidden;background:#f1f6ee;line-height:0}
@@ -13,6 +13,14 @@
 .flower-card-dialog::backdrop{background:#0f1e18a0}
 .flower-card-dialog img{display:block;width:min(100%,280px);height:auto;margin:0 auto 12px;border-radius:10px;image-rendering:auto}
 .flower-card-dialog h2{margin:0 0 12px;font-size:1.1rem}
+.friend-management{margin:16px 0;padding:12px;border:1px solid var(--line);border-radius:12px}
+.friend-management summary{cursor:pointer;font-weight:650}
+.friend-management .actions{margin-top:8px}
+.friend-management ul{list-style:none;padding:0;max-height:320px;overflow:auto}
+.friend-management li{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid var(--line);overflow-wrap:anywhere}
+.friend-management li button{flex-shrink:0}
+.friend-management button.danger{color:#9c302c}
+#friend-management-status:empty{display:none}
 </style>
 </head>
 <body>
@@ -49,6 +57,20 @@
     <form id="entry">
       <div class="tools"><label>選擇好友<select id="friend"><option value="">新增好友</option></select></label>
       <label id="new-field">新好友名稱<input id="new-friend" maxlength="80" placeholder="輸入遊戲暱稱"></label></div>
+      <details id="friend-management" class="friend-management" hidden>
+        <summary>管理這位好友</summary>
+        <fieldset id="friend-management-fields" style="border:0;padding:0;margin:10px 0 0;min-width:0">
+          <label>好友名稱<input id="rename-friend" maxlength="80"></label>
+          <div class="actions">
+            <button id="save-friend-name" type="button">儲存新名字</button>
+            <button id="delete-friend" class="danger" type="button">刪除整位好友</button>
+          </div>
+          <h3>已儲存的花</h3>
+          <p id="friend-flower-empty" hidden>這位好友目前沒有花。</p>
+          <ul id="friend-flowers" aria-label="已儲存的花"></ul>
+        </fieldset>
+        <p id="friend-management-status" role="status"></p>
+      </details>
       <div class="upload"><label for="screenshots">上傳遊戲截圖</label><p>可選多張圖片。請確認截圖中顯示清楚的花名。</p><input type="file" id="screenshots" accept="image/*" multiple>
       <div id="previews" class="previews"></div></div>
       <label for="manual">手動輸入花名（選填）</label>

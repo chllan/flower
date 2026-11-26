@@ -18,6 +18,9 @@ const friendSelect = $('friend');
 const filter = $('filter');
 const search = $('search');
 const rows = $('review-rows');
+const renameInput = $('rename-friend');
+const managementStatus = $('friend-management-status');
+let managedFriend = '';
 
 function flowerAlias(name) {
   return key(name) === '粉木槿花' ? '粉紅木槿花' : name;
@@ -46,7 +49,7 @@ function refresh() {
   $('record-count').textContent = [...flowers.values()].reduce((sum,f) => sum + f.owners.size, 0).toLocaleString('zh-TW');
   selectOptions(friendSelect, friends);
   selectOptions(filter, friends);
-  $('new-field').hidden = Boolean(friendSelect.value);
+  updateFriendManagement();
   render();
 }
 function show(next) {
@@ -276,7 +279,87 @@ document.querySelectorAll('[data-view]').forEach(btn => btn.onclick = () => show
 search.oninput = filter.onchange = $('layout').onchange = updateFilter;
 $('prev').onclick = () => {page--; render(); document.querySelector('.table-frame').scrollTop = 0;};
 $('next').onclick = () => {page++; render(); document.querySelector('.table-frame').scrollTop = 0;};
-friendSelect.onchange = () => {$('new-field').hidden = Boolean(friendSelect.value);};
+function updateFriendManagement() {
+  const friend = friendSelect.value;
+  $('new-field').hidden = Boolean(friend);
+  $('friend-management').hidden = !friend;
+  if (friend !== managedFriend) {
+    managedFriend = friend;
+    renameInput.value = friend;
+    managementStatus.textContent = '';
+  }
+  const list = $('friend-flowers');
+  list.replaceChildren();
+  for (const [name, flower] of flowers) {
+    if (!friend || !flower.owners.has(friend)) continue;
+    const item = make('li');
+    const button = make('button', '刪除這朵', 'danger');
+    button.type = 'button';
+    button.setAttribute('aria-label', '刪除「' + name + '」的持有紀錄');
+    button.onclick = () => {
+      if (confirm('確定從「' + friend + '」的花冊刪除「' + name + '」？')) {
+        editFriend({friend, flower:name});
+      }
+    };
+    item.append(make('span', name), button);
+    list.append(item);
+  }
+  $('friend-flower-empty').hidden = Boolean(list.children.length);
+}
+friendSelect.onchange = updateFriendManagement;
+
+$('save-friend-name').onclick = () => {
+  const friend = friendSelect.value;
+  const newName = exact(renameInput.value);
+  if (!newName) {
+    managementStatus.textContent = '請輸入好友名稱。';
+    renameInput.focus();
+    return;
+  }
+  if (friend && newName !== friend) editFriend({friend, newName});
+};
+renameInput.onkeydown = event => {
+  if (event.key === 'Enter' && !event.isComposing) {
+    event.preventDefault();
+    $('save-friend-name').click();
+  }
+};
+$('delete-friend').onclick = () => {
+  const friend = friendSelect.value;
+  if (friend && confirm('確定刪除「' + friend + '」和這位好友的所有持有紀錄？')) {
+    editFriend({friend});
+  }
+};
+
+async function editFriend(edit) {
+  if (saving || $('review-button').disabled) return;
+  const {friend, newName, flower} = edit;
+  const fields = $('friend-management-fields');
+  saving = fields.disabled = friendSelect.disabled = $('review-button').disabled = true;
+  managementStatus.textContent = '正在儲存…';
+  try {
+    await publishRecords([], edit);
+    const selectedFilter = filter.value;
+    load();
+    if (selectedFilter === friend) {
+      filter.value = newName || (flower ? friend : '');
+      updateFilter();
+    }
+    if (newName || flower) {
+      friendSelect.value = newName || friend;
+      updateFriendManagement();
+      managementStatus.textContent = newName ? '已更新好友名稱。' : '已刪除這筆持有紀錄。';
+    } else {
+      $('new-friend').value = '';
+      $('new-friend').focus();
+      connection.textContent = '已刪除「' + friend + '」。可以重新輸入好友資料。';
+    }
+  } catch (error) {
+    managementStatus.textContent = error.message || '儲存失敗，請重試。';
+  } finally {
+    saving = fields.disabled = friendSelect.disabled = $('review-button').disabled = false;
+  }
+}
 $('screenshots').onchange = () => {
   imageURLs.forEach(URL.revokeObjectURL);
   imageURLs = Array.from($('screenshots').files, file => URL.createObjectURL(file));
@@ -338,8 +421,7 @@ $('save').onclick = async () => {
   try {
     const records = [{friend:target,flower:''}, ...additions.map(flower => ({friend:target,flower}))];
     await publishRecords(records);
-    try { saveRecords(records); } catch { /* Shared data was already committed. */ }
-    merge(target,additions);
+    try { saveRecords(records); } catch { /* The shared copy was saved. */ }
     $('entry').reset();
     imageURLs.forEach(URL.revokeObjectURL);
     imageURLs = [];
@@ -347,7 +429,7 @@ $('save').onclick = async () => {
     renderImages('review-images');
     $('review').hidden = true;
     $('entry').hidden = false;
-    refresh();
+    load();
     friendSelect.value = target;
     friendSelect.onchange();
     filter.value = target;
@@ -374,10 +456,10 @@ function saveRecords(records) {
   localStorage.setItem(storageKey, JSON.stringify([...combined.values()]));
 }
 function load(message = '') {
-  friends = [...seed.friends];
-  flowers = new Map(Object.entries(seed.flowers).map(([name,f]) => [name,{grade:f.grade,owners:new Set(f.owners)}]));
+  friends = [];
+  flowers = new Map(Object.entries(seed.flowers).map(([name,f]) => [name,{grade:f.grade,owners:new Set()}]));
   try {
-    for (const {friend,flower} of combinedRecords(sharedRecords, readRecords())) merge(friend,[flowerAlias(flower)]);
+    for (const {friend,flower} of effectiveRecords(sharedData, readRecords())) merge(friend,[flower]);
     connection.textContent = message || (friends.length ? '' : '第一次使用時，可以匯入好友備份或新增好友。');
   } catch {
     connection.textContent = '目前無法讀取瀏覽器的花冊資料。';
@@ -388,7 +470,7 @@ function load(message = '') {
 }
 $('export-backup').onclick = () => {
   try {
-    const file = new Blob([JSON.stringify({version:1,records:combinedRecords(sharedRecords,readRecords())})],{type:'application/json'});
+    const file = new Blob([JSON.stringify({version:1,records:effectiveRecords(sharedData,readRecords())})],{type:'application/json'});
     const url = URL.createObjectURL(file);
     const link = make('a');
     link.href = url;
@@ -423,7 +505,37 @@ window.addEventListener('storage', event => {
 });
 
 const sharedApi = 'https://api.github.com/repos/chllan/flower/contents/flower-shared-data.json';
-let sharedRecords = [];
+let sharedData = {version:1, records:[], replacedFriends:[]};
+const seedRecords = [
+  ...seed.friends.map(friend => ({friend, flower:''})),
+  ...Object.entries(seed.flowers).flatMap(([flower, data]) =>
+    data.owners.map(friend => ({friend, flower}))),
+];
+
+function effectiveRecords(data, local, extra = []) {
+  const replaced = new Set(data.replacedFriends);
+  const fallback = (row) => !replaced.has(exact(row.friend));
+  return combinedRecords(seedRecords.filter(fallback), data.records, local.filter(fallback), extra);
+}
+
+function applyFriendEdit(records, replacedFriends, {friend, newName, flower}) {
+  if (!records.some(row => row.friend === friend)) {
+    throw new Error('這位好友已被移除或改名，請重新選擇。');
+  }
+  if (newName && records.some(row => row.friend === newName)) {
+    throw new Error('這個名字已經有人使用，請換一個名稱。');
+  }
+  replacedFriends.add(friend);
+  if (newName) {
+    replacedFriends.add(newName);
+    return records.map(row => row.friend === friend ? {...row, friend:newName} : row);
+  }
+  if (flower) {
+    return combinedRecords(records.filter(row => row.friend !== friend || row.flower !== flower),
+      [{friend, flower:''}]);
+  }
+  return records.filter(row => row.friend !== friend);
+}
 let sharedRevision = 0;
 let sharedWriting = false;
 
@@ -445,14 +557,19 @@ function parseShared(data) {
         typeof row.flower !== 'string' || row.flower.length > 80)) {
     throw new Error('共用資料的格式有誤。');
   }
-  return data.records;
+  const replacedFriends = data.replacedFriends ?? [];
+  if (!Array.isArray(replacedFriends) ||
+      replacedFriends.some(name => typeof name !== 'string' || !name.trim() || name.length > 80)) {
+    throw new Error('共用資料的格式有誤。');
+  }
+  return {version:1, records:data.records, replacedFriends:replacedFriends.map(exact)};
 }
 
 async function refreshShared() {
   if (sharedWriting) return;
   const revision = sharedRevision;
   try {
-    const response = await fetch('https://raw.githubusercontent.com/chllan/flower/main/flower-shared-data.json',
+    const response = await fetch('https://raw.githubusercontent.com/chllan/flower/main/flower-shared-data.json?t=' + Math.floor(Date.now() / 60000),
       {cache:'no-store', signal:AbortSignal.timeout(12000)});
     if (revision !== sharedRevision || sharedWriting) return;
     if (response.status === 404) {
@@ -460,10 +577,10 @@ async function refreshShared() {
       return;
     }
     if (!response.ok) throw new Error();
-    const records = parseShared(await response.json());
+    const data = parseShared(await response.json());
     if (revision !== sharedRevision || sharedWriting) return;
-    if (JSON.stringify(records) !== JSON.stringify(sharedRecords)) {
-      sharedRecords = records;
+    if (JSON.stringify(data) !== JSON.stringify(sharedData)) {
+      sharedData = data;
       load();
       if (!$('review').hidden) classify();
     }
@@ -473,14 +590,14 @@ async function refreshShared() {
   }
 }
 
-function encodeShared(records) {
-  const bytes = new TextEncoder().encode(JSON.stringify({version:1,records}));
+function encodeShared(data) {
+  const bytes = new TextEncoder().encode(JSON.stringify(data));
   let binary = '';
   for (const byte of bytes) binary += String.fromCharCode(byte);
   return btoa(binary);
 }
 
-async function publishRecords(extra = []) {
+async function publishRecords(extra = [], edit) {
   const token = $('shared-token').value.trim();
   if (!token) throw new Error('請先在「管理共用花冊」輸入 GitHub 更新權杖。');
   if (sharedWriting) throw new Error('正在發布，請稍候。');
@@ -491,7 +608,7 @@ async function publishRecords(extra = []) {
   try {
     for (let attempt = 0; attempt < 2; attempt++) {
       const current = await fetch(sharedApi + '?ref=main', {headers,cache:'no-store',signal:AbortSignal.timeout(15000)});
-      let remote = [];
+      let remote = {version:1, records:[], replacedFriends:[]};
       let sha;
       if (current.ok) {
         const file = await current.json();
@@ -501,16 +618,19 @@ async function publishRecords(extra = []) {
       } else if (current.status !== 404) {
         throw new Error('無法讀取 GitHub 資料，請確認權杖和 repo 權限。');
       }
-      const records = combinedRecords(remote,readRecords(),extra);
+      const replacedFriends = new Set(remote.replacedFriends);
+      let records = effectiveRecords(remote, readRecords(), extra);
+      if (edit) records = applyFriendEdit(records, replacedFriends, edit);
+      const data = {version:1, records, replacedFriends:[...replacedFriends]};
       const response = await fetch(sharedApi, {
         method:'PUT',
         headers:{...headers,'Content-Type':'application/json'},
         signal:AbortSignal.timeout(20000),
-        body:JSON.stringify({message:'Update shared flower inventory',branch:'main',sha,content:encodeShared(records)}),
+        body:JSON.stringify({message:'Update shared flower inventory',branch:'main',sha,content:encodeShared(data)}),
       });
       if (response.ok) {
         sharedRevision++;
-        sharedRecords = records;
+        sharedData = data;
         $('shared-status').textContent = '已發布共用花冊。';
         return;
       }
