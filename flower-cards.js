@@ -306,6 +306,45 @@
     }
   }
 
+  function fitTwoCardRows(container) {
+    const children = [...container.children];
+    if (!container.clientWidth || !children.length) return;
+
+    const style = getComputedStyle(container);
+    const padding = parseFloat(style.paddingTop) + parseFloat(style.paddingBottom);
+    let rowTop;
+    let rows = 0;
+    let top;
+    let bottom;
+    for (const child of children) {
+      const rect = child.getBoundingClientRect();
+      if (rect.top !== rowTop) {
+        rowTop = rect.top;
+        rows++;
+        if (rows === 1) top = rect.top;
+        if (rows === 3) break;
+      }
+      bottom = Math.max(bottom ?? rect.bottom, rect.bottom);
+    }
+    container.style.maxHeight = rows === 3 ? Math.ceil(bottom - top + padding) + 'px' : '';
+  }
+
+  function watchCardRows(container) {
+    const measure = () => fitTwoCardRows(container);
+    const sizes = new ResizeObserver(measure);
+    const cardsChanged = () => {
+      sizes.disconnect();
+      sizes.observe(container);
+      for (const child of container.children) sizes.observe(child);
+      measure();
+    };
+    new MutationObserver(cardsChanged).observe(container, {childList:true});
+    cardsChanged();
+  }
+
+  watchCardRows(collection);
+  watchCardRows(grid);
+
   function renderCollection() {
     if (collection.hidden) return;
     if (!catalogPage.length) {

@@ -95,8 +95,7 @@ nav #export-backup{white-space:nowrap}
 }
 
 #catalog-cards,#gallery-grid{
-  max-height:64vh;
-  max-height:64dvh;
+  grid-auto-rows:max-content;
   overflow-y:auto;
   align-content:start;
   padding:4px;
