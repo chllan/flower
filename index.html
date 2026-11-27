@@ -4,8 +4,8 @@
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="description" content="管理及查詢遊戲好友擁有的花種">
 <title>好友花種圖鑑</title>
-<link rel="stylesheet" href="./style.css?v=friend-columns-12"><script defer src="./seed.js"></script><script defer src="./app.js?v=page-50"></script>
-<script defer src="./flower-cards.js?v=page-50"></script>
+<link rel="stylesheet" href="./style.css?v=admin-mobile-13"><script defer src="./seed.js"></script><script defer src="./app.js?v=search-grade-14"></script>
+<script defer src="./flower-cards.js?v=search-grade-14"></script>
 <style>
 .flower-card-button{display:inline-flex;vertical-align:middle;padding:0;margin:0 8px 0 0;border-radius:8px;overflow:hidden;background:#f1f6ee;line-height:0}
 .flower-card-button img{width:42px;height:42px;object-fit:cover}
@@ -47,13 +47,14 @@ nav{flex-wrap:wrap}
   <section class="intro"><h1>好友花種圖鑑</h1><p>查找好友的花種，或上傳遊戲截圖更新收藏。</p>
     <div class="stats"><div><strong id="friend-count">—</strong> 位好友</div><div><strong id="flower-count">—</strong> 個花種</div><div><strong id="record-count">—</strong> 筆持有紀錄</div></div>
   </section>
-  <nav aria-label="花冊功能"><button type="button" data-view="catalog" aria-current="page">花種收藏</button><button type="button" data-view="gallery">圖庫</button><button type="button" id="export-backup">匯出好友備份</button><button type="button" data-view="editor" data-admin hidden>新增／更新好友</button></nav>
+  <nav aria-label="花冊功能"><button type="button" data-view="catalog" aria-current="page">花種收藏</button><button type="button" data-view="gallery">圖庫</button><button type="button" id="export-backup">匯出好友備份</button></nav>
   <div class="actions backup-import">
+    <button type="button" data-view="editor" data-admin hidden>新增／更新好友</button>
     <button type="button" id="import-backup" data-admin hidden>匯入好友備份</button>
     <input type="file" id="backup-file" accept=".json,application/json" hidden>
   </div>
   <details id="admin-panel" style="margin:12px 0">
-    <summary>管理員登入</summary>
+    <summary id="admin-panel-title">管理員登入</summary>
     <form id="admin-login">
     <label>GitHub 更新權杖<input id="shared-token" type="password" autocomplete="off" autocapitalize="off" spellcheck="false"></label>
     <button id="admin-login-button" type="submit">登入</button>

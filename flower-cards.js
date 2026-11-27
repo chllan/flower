@@ -351,7 +351,7 @@
     if (gallery.hidden) return;
     const term = key(search.value);
     const matches = [...cards.keys()].filter(name => flowerMatches(name, term) &&
-      (!grade.value || (flowers.get(name)?.grade || 'ungraded') === grade.value)).sort(byName);
+      (!grade.value || (flowers.get(name)?.grade || 'ungraded') === grade.value)).sort(term ? byFlowerGrade : byName);
     const lastPage = Math.max(1, Math.ceil(matches.length / pageSize));
     page = Math.min(page, lastPage);
     const visible = matches.slice((page - 1) * pageSize, page * pageSize);

@@ -87,7 +87,8 @@ body{background:#f7f4ee}
 
 nav #export-backup{white-space:nowrap}
 .backup-import:has(#import-backup[hidden]){display:none}
-.backup-import{margin-bottom:14px}
+.backup-import{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-bottom:10px}
+.backup-import button{padding-inline:6px;min-width:0;min-height:44px;font-size:clamp(.8rem,3.8vw,1rem)}
 @media(max-width:420px){
   nav[aria-label="花冊功能"]{gap:6px}
   nav[aria-label="花冊功能"] button{padding-inline:8px;font-size:clamp(.85rem,4vw,1rem)}

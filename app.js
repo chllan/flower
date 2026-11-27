@@ -120,6 +120,14 @@ function flowerMatches(name, term) {
   return key(name).includes(term) || [...sharedData.flowerRenames.keys()]
     .some(old => flowerAlias(old) === name && key(old).includes(term));
 }
+const flowerGradeOrder = new Map([
+  ['仙品', 0], ['華品', 1], ['珍品', 2], ['普通', 3], ['普品', 3], ['凡品', 4]
+]);
+function byFlowerGrade(a, b) {
+  const gradeA = flowerGradeOrder.get(flowers.get(a)?.grade) ?? 5;
+  const gradeB = flowerGradeOrder.get(flowers.get(b)?.grade) ?? 5;
+  return gradeA - gradeB || byName(a, b);
+}
 let catalogPage = [];
 function render() {
   const selected = filter.value;
@@ -132,7 +140,7 @@ function render() {
   const matches = [...flowers].filter(([name,f]) => flowerMatches(name, term) &&
       (!selected || f.owners.has(selected)) && (!owned || f.owners.size) &&
       (!grade || (f.grade || 'ungraded') === grade));
-  if (term) matches.sort(([a],[b]) => Number(key(b) === term)-Number(key(a) === term) || byName(a,b));
+  if (term) matches.sort(([a],[b]) => byFlowerGrade(a, b));
   const last = Math.max(1, Math.ceil(matches.length / size));
   page = Math.min(page,last);
   $('prev').disabled = page <= 1;
@@ -601,6 +609,7 @@ window.addEventListener('storage', event => {
 
 let adminToken = '';
 function updateAdminView() {
+  $('admin-panel-title').textContent = adminToken ? '管理員工具' : '管理員登入';
   for (const field of document.querySelectorAll('[data-admin]')) field.hidden = !adminToken;
   $('admin-login').hidden = Boolean(adminToken);
   if (view === 'editor' && !adminToken) show('catalog');
@@ -626,6 +635,7 @@ $('admin-login').onsubmit = async (event) => {
     adminToken = token;
     $('shared-token').value = '';
     status.textContent = '已登入管理模式。';
+    $('admin-panel').open = false;
     updateAdminView();
   } catch (error) {
     status.textContent = error.message || '無法驗證權杖，請稍後再試。';
