@@ -25,8 +25,204 @@
   dialog.append(title, fullImage, close);
   document.body.append(dialog);
 
+  const form = document.getElementById('card-edit-template').content.firstElementChild.cloneNode(true);
+  const edit = id => form.querySelector('#card-' + id);
+  const file = edit('edit-file');
+  const canvas = edit('crop-preview');
+  const controls = edit('crop-controls');
+  const position = edit('crop-position');
+  const horizontal = edit('crop-x');
+  const vertical = edit('crop-y');
+  const zoom = edit('crop-zoom');
+  const status = edit('edit-status');
+  const submit = edit('edit-save');
+  const cancel = edit('edit-cancel');
+  const change = document.createElement('button');
+  change.type = 'button';
+  change.textContent = '更換圖卡';
+  dialog.append(change, form);
+
+  const customFolder = 'flower-card-images';
+  const repositoryApi = 'https://api.github.com/repos/chllan/flower/contents/' + customFolder;
+  const customCards = new Map();
+  let selectedName = '';
+  let source = null;
+  let decodeVersion = 0;
+  let publishing = false;
+
+  function toBase64(bytes) {
+    let binary = '';
+    for (const byte of bytes) binary += String.fromCharCode(byte);
+    return btoa(binary);
+  }
+
+  function cardFilename(name) {
+    const encoded = toBase64(new TextEncoder().encode(name))
+      .replaceAll('+', '-').replaceAll('/', '_').replace(/=+$/, '');
+    if (encoded.length > 240) throw new Error('花名太長，請縮短後再試。');
+    return encoded + '.jpg';
+  }
+
+  async function loadCustomCards() {
+    try {
+      const response = await fetch(repositoryApi + '?ref=main', {
+        cache:'no-store', signal:AbortSignal.timeout(10000),
+      });
+      if (!response.ok) return;
+      const files = await response.json();
+      if (!Array.isArray(files)) return;
+      for (const item of files) {
+        if (item.type !== 'file' || !/^[A-Za-z0-9_-]+\.jpg$/.test(item.name) ||
+            !/^[a-f0-9]{40}$/.test(item.sha)) continue;
+        const binary = atob(item.name.slice(0,-4).replaceAll('-', '+').replaceAll('_', '/'));
+        const name = new TextDecoder().decode(Uint8Array.from(binary, c => c.charCodeAt(0)));
+        if (!customCards.has(name)) customCards.set(name, {
+          src:'https://raw.githubusercontent.com/chllan/flower/main/' + customFolder + '/' + item.name + '?v=' + item.sha,
+        });
+      }
+      refreshCards();
+    } catch {
+      // The bundled gallery remains available.
+    }
+  }
+
+  function openEditor(name) {
+    form.reset();
+    cancel.textContent = '取消';
+    decodeVersion++;
+    source = null;
+    submit.disabled = true;
+    controls.hidden = true;
+    status.textContent = '';
+    edit('edit-name').value = name;
+    edit('edit-token-field').hidden = Boolean(document.getElementById('shared-token').value.trim());
+    title.textContent = '新增／更換圖卡';
+    fullImage.hidden = true;
+    change.hidden = close.hidden = true;
+    form.hidden = false;
+    if (!dialog.open) dialog.showModal();
+  }
+
+  function drawCrop() {
+    if (!source) return;
+    const width = source.naturalWidth;
+    const height = source.naturalHeight;
+    let centerX = width / 2;
+    let centerY = height / 2;
+    let side = Math.min(width,height);
+    if (position.value !== 'single') {
+      const slot = Number(position.value);
+      centerX = width * [.192,.5,.808][slot % 3];
+      centerY = height * ([.425,.602,.779][Math.floor(slot / 3)] - (width === 591 ? .0185 : 0));
+      side = width * .26;
+    } else if (height / width > 1.8) {
+      centerY = height * .408;
+      side = width * .84;
+    }
+    const cropSize = Math.min(side * 100 / Number(zoom.value), width, height);
+    const left = Math.max(0, Math.min(width - cropSize,
+      centerX - cropSize / 2 + width * Number(horizontal.value) / 200));
+    const top = Math.max(0, Math.min(height - cropSize,
+      centerY - cropSize / 2 + height * Number(vertical.value) / 200));
+    canvas.getContext('2d').drawImage(source,left,top,cropSize,cropSize,0,0,canvas.width,canvas.height);
+  }
+
+  file.onchange = async () => {
+    const imageFile = file.files[0];
+    const version = ++decodeVersion;
+    source = null;
+    submit.disabled = true;
+    controls.hidden = true;
+    status.textContent = '';
+    if (!imageFile) return;
+    const url = URL.createObjectURL(imageFile);
+    try {
+      const image = new Image();
+      image.src = url;
+      await image.decode();
+      if (version !== decodeVersion) return;
+      source = image;
+      drawCrop();
+      controls.hidden = false;
+      submit.disabled = false;
+    } catch {
+      if (version === decodeVersion) status.textContent = '無法讀取這張圖片，請試試 PNG 或 JPG。';
+    } finally {
+      URL.revokeObjectURL(url);
+    }
+  };
+  position.onchange = () => {
+    horizontal.value = vertical.value = '0';
+    zoom.value = '100';
+    drawCrop();
+  };
+  for (const slider of [horizontal,vertical,zoom]) slider.oninput = drawCrop;
+  change.onclick = () => openEditor(selectedName);
+  document.getElementById('gallery-upload').onclick = () => openEditor('');
+  cancel.onclick = () => dialog.close();
+  dialog.addEventListener('cancel', event => {
+    if (publishing) event.preventDefault();
+  });
+  dialog.addEventListener('close', () => {
+    decodeVersion++;
+    source = null;
+    form.reset();
+    form.hidden = true;
+  });
+
+  async function publishCard(name, data, token) {
+    const endpoint = repositoryApi + '/' + cardFilename(name);
+    const headers = {Authorization:'Bearer ' + token, Accept:'application/vnd.github+json'};
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const current = await fetch(endpoint + '?ref=main', {
+        headers, cache:'no-store', signal:AbortSignal.timeout(15000),
+      });
+      if (!current.ok && current.status !== 404) {
+        throw new Error('無法讀取 GitHub 圖卡，請確認權杖和權限。');
+      }
+      const sha = current.ok ? (await current.json()).sha : undefined;
+      const result = await fetch(endpoint, {
+        method:'PUT', headers:{...headers,'Content-Type':'application/json'},
+        body:JSON.stringify({message:'Update flower card: ' + name, content:data, sha, branch:'main'}),
+        signal:AbortSignal.timeout(20000),
+      });
+      if (result.ok) return;
+      if (attempt === 0 && [409,422].includes(result.status)) continue;
+      throw new Error('GitHub 儲存失敗（' + result.status + '），請確認權杖有 Contents 寫入權限。');
+    }
+  }
+
+  form.onsubmit = async event => {
+    event.preventDefault();
+    if (!source || publishing) return;
+    const name = canonical(edit('edit-name').value);
+    const token = document.getElementById('shared-token').value.trim() || edit('edit-token').value.trim();
+    if (!name || !token) {
+      status.textContent = '請填花名和 GitHub 更新權杖。';
+      return;
+    }
+    publishing = submit.disabled = cancel.disabled = true;
+    status.textContent = '正在發布圖卡…';
+    try {
+      const src = canvas.toDataURL('image/jpeg',.86);
+      if (!src.startsWith('data:image/jpeg;base64,')) throw new Error('這個瀏覽器無法輸出 JPG，請更新瀏覽器再試。');
+      await publishCard(name,src.split(',')[1],token);
+      customCards.set(name,{src});
+      refreshCards();
+      edit('edit-token').value = '';
+      submit.disabled = true;
+      cancel.textContent = '關閉';
+      status.textContent = '已發布「' + name + '」的圖卡。';
+    } catch (error) {
+      status.textContent = error.message || '發布失敗，請再試一次。';
+      submit.disabled = false;
+    } finally {
+      publishing = cancel.disabled = false;
+    }
+  };
+
   function imageButton(name, image, inGallery = false) {
-    const src = 'data:image/webp;base64,' + image;
+    const {src, fallback} = image;
     const button = document.createElement('button');
     button.type = 'button';
     button.setAttribute('aria-label', '查看「' + name + '」花圖');
@@ -35,6 +231,10 @@
     thumbnail.loading = 'lazy';
     thumbnail.alt = '';
     thumbnail.src = src;
+    if (fallback) thumbnail.onerror = () => {
+      thumbnail.onerror = null;
+      thumbnail.src = fallback;
+    };
     button.append(thumbnail);
     if (inGallery) {
       const caption = document.createElement('span');
@@ -42,8 +242,11 @@
       button.append(caption);
     }
     button.onclick = () => {
+      selectedName = name;
       title.textContent = name;
-      fullImage.src = src;
+      form.hidden = true;
+      fullImage.hidden = change.hidden = close.hidden = false;
+      fullImage.src = thumbnail.src;
       fullImage.alt = name + '的遊戲花圖';
       dialog.showModal();
     };
@@ -52,9 +255,14 @@
 
   function addCards() {
     for (const heading of table.querySelectorAll('tbody th[scope="row"]')) {
-      if (heading.querySelector('.flower-card-button')) continue;
+      const previous = heading.querySelector('.flower-card-button');
       const name = heading.textContent.trim();
-      if (cards.has(name)) heading.prepend(imageButton(name, cards.get(name)));
+      const card = cards.get(name);
+      if (!card || previous?.dataset.cardSrc === card.src) continue;
+      const button = imageButton(name,card);
+      button.dataset.cardSrc = card.src;
+      if (previous) previous.replaceWith(button);
+      else heading.prepend(button);
     }
   }
 
@@ -76,7 +284,17 @@
     const updated = new Map();
     for (const [name, image] of Object.entries(images)) {
       const corrected = canonical(name);
-      if (!updated.has(corrected) || name === corrected) updated.set(corrected, image);
+      if (!updated.has(corrected) || name === corrected) {
+        updated.set(corrected,{src:'data:image/webp;base64,' + image});
+      }
+    }
+    const overrides = new Map();
+    for (const [name, card] of customCards) {
+      const corrected = canonical(name);
+      if (!overrides.has(corrected) || name === corrected) overrides.set(corrected,card);
+    }
+    for (const [name, card] of overrides) {
+      updated.set(name,{...card, fallback:updated.get(name)?.src});
     }
     cards = updated;
     addCards();
@@ -89,4 +307,5 @@
   document.addEventListener('flower-catalog-updated', refreshCards);
   new MutationObserver(addCards).observe(table, {childList:true});
   refreshCards();
+  loadCustomCards();
 })();
