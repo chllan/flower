@@ -45,3 +45,27 @@ body{background:#f7f4ee}
 [data-grade] .gallery-grade{justify-self:start;display:inline-block;padding:2px 8px;border-radius:20px;background:var(--grade-bg,#edf1eb);color:var(--grade-ink,#42634e);font-weight:700;line-height:1.35}
 #gallery-grid .gallery-grade{justify-self:center}
 .owned-filter input[type="checkbox"]{display:inline-block;flex:0 0 auto;width:1.1em;min-height:0;height:1.1em;margin:0;padding:0;accent-color:var(--green)}
+
+/* Soft grade surfaces and filter controls */
+[data-grade="凡品"]{--grade-surface:#f0f8eb}
+[data-grade="普通"],[data-grade="普品"]{--grade-surface:#eef6fd}
+[data-grade="珍品"]{--grade-surface:#f6f1fb}
+[data-grade="華品"]{--grade-surface:#fff7eb}
+[data-grade="仙品"]{--grade-surface:#fdf0f3}
+.collection-card{background:var(--grade-surface,#fffdf9)}
+.friend-filter{min-width:0}
+.friend-filter label+label{margin-top:8px}
+.friend-filter [role="status"]{display:block;font-size:.85rem;color:#884434;margin-top:4px}
+.friend-filter [role="status"]:empty{display:none}
+#catalog .tools{grid-template-columns:repeat(3,minmax(0,1fr))}
+.gallery-filters{grid-template-columns:1fr}
+.grade-filter{grid-column:1/-1;grid-row:2;min-width:0;font-weight:650}
+.grade-options{display:flex;flex-wrap:wrap;gap:7px;margin-top:6px}
+.grade-options button{min-height:42px;padding:5px 10px;color:var(--grade-ink,#244335);background:var(--grade-surface,#f6f7f2);border-color:var(--grade-border,#bac9bf)}
+.grade-options button[aria-pressed="true"]{background:var(--grade-bg,#e1ebe3);border-color:var(--grade-ink,#244335);box-shadow:inset 0 0 0 1px var(--grade-ink,#244335)}
+.grade-options button[aria-pressed="true"]::before{content:'✓ ';font-weight:800}
+@media(max-width:620px){
+  #catalog .tools,.gallery-filters{grid-template-columns:repeat(2,minmax(0,1fr))}
+  #catalog .tools>label:first-child,.gallery-filters>label:first-child{grid-column:1/-1}
+  .grade-filter{grid-row:auto}
+}

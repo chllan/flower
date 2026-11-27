@@ -41,6 +41,47 @@ function selectOptions(select, options) {
   select.replaceChildren(select.options[0], ...options.map(name => new Option(name, name)));
   if (options.includes(current)) select.value = current;
 }
+const friendFilterSearch = $('friend-filter-search');
+
+function refreshFriendFilter() {
+  const query = key(friendFilterSearch.value);
+  const current = filter.value;
+  const matches = friends.filter(name => key(name).includes(query));
+  selectOptions(filter, friends.filter(name => name === current || matches.includes(name)));
+  $('friend-filter-status').textContent = query && !matches.length ? '找不到符合的好友' : '';
+  return matches;
+}
+
+function chooseFriendFilter(name) {
+  friendFilterSearch.value = '';
+  refreshFriendFilter();
+  filter.value = name;
+}
+
+function initializeGradeButtons(id) {
+  const select = $(id);
+  const group = select.parentElement.querySelector('.grade-options');
+  for (const option of select.options) {
+    const button = make('button', option.textContent === '普通' ? '普品' : option.textContent);
+    button.type = 'button';
+    button.dataset.grade = option.value;
+    button.onclick = () => {
+      select.value = option.value;
+      select.dispatchEvent(new Event('change'));
+    };
+    group.append(button);
+  }
+  const updateSelection = () => {
+    for (const button of group.children) {
+      button.setAttribute('aria-pressed', String(button.dataset.grade === select.value));
+    }
+  };
+  select.addEventListener('change', updateSelection);
+  updateSelection();
+  select.hidden = true;
+  group.hidden = false;
+}
+
 function merge(friend, names) {
   if (!friends.includes(friend)) friends.push(friend);
   for (const name of names) {
@@ -59,7 +100,7 @@ function refresh() {
   $('flower-count').textContent = flowers.size;
   $('record-count').textContent = [...flowers.values()].reduce((sum,f) => sum + f.owners.size, 0).toLocaleString('zh-TW');
   selectOptions(friendSelect, friends);
-  selectOptions(filter, friends);
+  refreshFriendFilter();
   updateFriendManagement();
   render();
 }
@@ -131,7 +172,7 @@ function render() {
       for (const person of friends.filter(p => f.owners.has(p))) {
         const button = make('button',person,'owner');
         button.type = 'button';
-        button.onclick = () => { filter.value = person; search.value = ''; updateFilter(); };
+        button.onclick = () => { chooseFriendFilter(person); search.value = ''; updateFilter(); };
         ownership.append(button);
       }
       if (!f.owners.size) ownership.textContent = '—';
@@ -306,6 +347,19 @@ async function recognize(files) {
 }
 document.querySelectorAll('[data-view]').forEach(btn => btn.onclick = () => show(btn.dataset.view));
 search.oninput = filter.onchange = $('layout').onchange = $('catalog-grade').onchange = $('catalog-owned').onchange = updateFilter;
+friendFilterSearch.oninput = refreshFriendFilter;
+friendFilterSearch.onkeydown = event => {
+  if (event.key !== 'Enter' || event.isComposing) return;
+  const query = key(friendFilterSearch.value);
+  if (!query) return;
+  const matches = refreshFriendFilter();
+  const match = matches.find(name => key(name) === query) || (matches.length === 1 ? matches[0] : '');
+  if (!match) return;
+  filter.value = match;
+  updateFilter();
+};
+initializeGradeButtons('catalog-grade');
+initializeGradeButtons('gallery-grade');
 $('prev').onclick = () => {page--; render(); document.querySelector('.table-frame').scrollTop = 0;};
 $('next').onclick = () => {page++; render(); document.querySelector('.table-frame').scrollTop = 0;};
 function updateFriendManagement() {
@@ -371,7 +425,7 @@ async function editFriend(edit) {
     const selectedFilter = filter.value;
     load();
     if (selectedFilter === friend) {
-      filter.value = newName || (flower ? friend : '');
+      chooseFriendFilter(newName || (flower ? friend : ''));
       updateFilter();
     }
     if (newName || flower) {
@@ -461,7 +515,7 @@ $('save').onclick = async () => {
     load();
     friendSelect.value = target;
     friendSelect.onchange();
-    filter.value = target;
+    chooseFriendFilter(target);
     search.value = '';
     updateFilter();
     show('catalog');

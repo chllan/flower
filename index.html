@@ -4,7 +4,7 @@
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="description" content="管理及查詢遊戲好友擁有的花種">
 <title>好友花種圖鑑</title>
-<link rel="stylesheet" href="./style.css?v=grade-8"><script defer src="./seed.js"></script><script defer src="./app.js?v=flower-admin-3"></script>
+<link rel="stylesheet" href="./style.css?v=soft-9"><script defer src="./seed.js"></script><script defer src="./app.js?v=soft-9"></script>
 <script defer src="./flower-cards.js?v=grade-8"></script>
 <style>
 .flower-card-button{display:inline-flex;vertical-align:middle;padding:0;margin:0 8px 0 0;border-radius:8px;overflow:hidden;background:#f1f6ee;line-height:0}
@@ -33,8 +33,8 @@ nav{flex-wrap:wrap}
 [hidden]{display:none!important}
 .gallery-filters{display:grid;grid-template-columns:2fr 1fr;gap:12px}
 #gallery-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px;margin-top:12px}
-#gallery-grid button{display:grid;grid-template-rows:auto 1fr auto;gap:5px;min-width:0;padding:8px;text-align:center;background:#fff;border:1px solid var(--grade-border,#d7e4db);border-radius:12px}
-#gallery-grid button:hover,#gallery-grid button:focus-visible{border-color:#638876;background:#f5faf6}
+#gallery-grid button{display:grid;grid-template-rows:auto 1fr auto;gap:5px;min-width:0;padding:8px;text-align:center;background:var(--grade-surface,#fff);border:1px solid var(--grade-border,#d7e4db);border-radius:12px}
+#gallery-grid button:hover,#gallery-grid button:focus-visible{border-color:var(--grade-ink,#638876);background:var(--grade-bg,#f5faf6)}
 #gallery-grid img{width:100%;height:auto;aspect-ratio:1;object-fit:contain;border-radius:8px;background:var(--grade-bg,#f1f6ee)}
 #gallery-grid .gallery-name{align-self:center;line-height:1.25;overflow-wrap:anywhere}
 #gallery-grid .gallery-grade{font-size:.8rem;line-height:1.25}
@@ -82,8 +82,12 @@ nav{flex-wrap:wrap}
   <section id="catalog" class="page" hidden>
     <div class="tools">
       <label>搜尋花名<input id="search" type="search" placeholder="例如：滿天星"></label>
-      <label>篩選好友<select id="filter"><option value="">所有好友</option></select></label>
-      <label>品級<select id="catalog-grade"><option value="">全部品級</option><option>仙品</option><option>華品</option><option>珍品</option><option>普通</option><option>凡品</option><option value="ungraded">未分類</option></select></label>
+      <div class="friend-filter">
+        <label>搜尋好友名字<input id="friend-filter-search" type="search" placeholder="輸入部分名字" autocomplete="off"></label>
+        <label>篩選好友<select id="filter"><option value="">所有好友</option></select></label>
+        <span id="friend-filter-status" role="status"></span>
+      </div>
+      <div class="grade-filter"><span id="catalog-grade-label">品級</span><select aria-labelledby="catalog-grade-label" id="catalog-grade"><option value="">全部品級</option><option>仙品</option><option>華品</option><option>珍品</option><option>普通</option><option>凡品</option><option value="ungraded">未分類</option></select><div class="grade-options" role="group" aria-labelledby="catalog-grade-label" hidden></div></div>
       <label>顯示方式<select id="layout"><option value="cards">收藏卡片</option><option value="list">持有人清單</option><option value="matrix">好友持有矩陣</option></select></label>
     </div>
     <label class="owned-filter"><input id="catalog-owned" type="checkbox" checked> 只顯示已收藏花種</label>
@@ -95,7 +99,7 @@ nav{flex-wrap:wrap}
   <section id="gallery" class="page" hidden aria-label="花朵圖庫">
     <div class="gallery-filters">
       <label>搜尋圖卡<input id="gallery-search" type="search" placeholder="輸入花名"></label>
-      <label>花朵品級<select id="gallery-grade"><option value="">全部品級</option><option>仙品</option><option>華品</option><option>珍品</option><option>普通</option><option>凡品</option><option value="ungraded">未分類</option></select></label>
+      <div class="grade-filter"><span id="gallery-grade-label">花朵品級</span><select aria-labelledby="gallery-grade-label" id="gallery-grade"><option value="">全部品級</option><option>仙品</option><option>華品</option><option>珍品</option><option>普通</option><option>凡品</option><option value="ungraded">未分類</option></select><div class="grade-options" role="group" aria-labelledby="gallery-grade-label" hidden></div></div>
     </div>
     <div class="results"><p id="gallery-count" aria-live="polite"></p>
       <div class="pages"><button id="gallery-prev" type="button">上一頁</button><span id="gallery-page"></span><button id="gallery-next" type="button">下一頁</button></div>
