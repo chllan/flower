@@ -64,7 +64,7 @@ function refresh() {
   render();
 }
 function show(next) {
-  view = next;
+  view = next === 'editor' && !adminToken ? 'catalog' : next;
   if (!ready) return;
   for (const tab of document.querySelectorAll('[data-view]')) {
     if (tab.dataset.view === view) tab.setAttribute('aria-current','page');
@@ -79,12 +79,18 @@ function flowerMatches(name, term) {
   return key(name).includes(term) || [...sharedData.flowerRenames.keys()]
     .some(old => flowerAlias(old) === name && key(old).includes(term));
 }
+let catalogPage = [];
 function render() {
   const selected = filter.value;
   const term = key(search.value);
-  const matrix = $('layout').value === 'matrix';
+  const mode = $('layout').value;
+  const matrix = mode === 'matrix';
+  const grade = $('catalog-grade').value;
+  const owned = mode === 'cards' && $('catalog-owned').checked;
   const people = selected ? [selected] : friends;
-  const matches = [...flowers].filter(([name,f]) => flowerMatches(name, term) && (!selected || f.owners.has(selected)));
+  const matches = [...flowers].filter(([name,f]) => flowerMatches(name, term) &&
+      (!selected || f.owners.has(selected)) && (!owned || f.owners.size) &&
+      (!grade || (f.grade || 'ungraded') === grade));
   if (term) matches.sort(([a],[b]) => Number(key(b) === term)-Number(key(a) === term) || byName(a,b));
   const last = Math.max(1, Math.ceil(matches.length / size));
   page = Math.min(page,last);
@@ -93,6 +99,12 @@ function render() {
   $('page-number').textContent = page + ' / ' + last;
   $('summary').textContent = (selected ? selected + ' · ' : '') + matches.length + ' 個花種';
   const table = $('inventory');
+  catalogPage = matches.slice((page-1)*size,page*size);
+  table.closest('.table-frame').hidden = mode === 'cards';
+  $('catalog-cards').hidden = mode !== 'cards';
+  $('catalog-owned').closest('label').hidden = mode !== 'cards';
+  document.dispatchEvent(new Event('flower-collection-updated'));
+  if (mode === 'cards') return;
   table.className = matrix ? 'matrix' : '';
   const head = make('thead'), header = make('tr'), body = make('tbody');
   const columns = ['花名','品項',...(matrix ? people : ['持有人數','擁有的好友'])];
@@ -108,7 +120,7 @@ function render() {
     tr.append(td);
     body.append(tr);
   }
-  for (const [name,f] of matches.slice((page-1)*size,page*size)) {
+  for (const [name,f] of catalogPage) {
     const tr = make('tr'), label = make('th',name);
     label.scope = 'row';
     tr.append(label, make('td',f.grade || '—'));
@@ -293,7 +305,7 @@ async function recognize(files) {
   }
 }
 document.querySelectorAll('[data-view]').forEach(btn => btn.onclick = () => show(btn.dataset.view));
-search.oninput = filter.onchange = $('layout').onchange = updateFilter;
+search.oninput = filter.onchange = $('layout').onchange = $('catalog-grade').onchange = $('catalog-owned').onchange = updateFilter;
 $('prev').onclick = () => {page--; render(); document.querySelector('.table-frame').scrollTop = 0;};
 $('next').onclick = () => {page++; render(); document.querySelector('.table-frame').scrollTop = 0;};
 function updateFriendManagement() {
@@ -511,9 +523,10 @@ $('import-backup').onclick = () => $('backup-file').click();
 $('backup-file').onchange = async () => {
   const file = $('backup-file').files[0];
   $('backup-file').value = '';
-  if (!file) return;
+  if (!file || !adminToken) return;
   try {
     const data = JSON.parse(await file.text());
+    if (!adminToken) return;
     if (data?.version !== 1 || !Array.isArray(data.records) ||
         data.records.some(r => !r || typeof r.friend !== 'string' || !r.friend.trim() ||
           r.friend.length > 80 || typeof r.flower !== 'string' || r.flower.length > 80)) {
@@ -531,6 +544,47 @@ window.addEventListener('storage', event => {
   load();
   if (!$('review').hidden) classify();
 });
+
+let adminToken = '';
+function updateAdminView() {
+  for (const field of document.querySelectorAll('[data-admin]')) field.hidden = !adminToken;
+  $('admin-login').hidden = Boolean(adminToken);
+  if (view === 'editor' && !adminToken) show('catalog');
+  document.dispatchEvent(new Event('flower-admin-updated'));
+}
+$('admin-login').onsubmit = async (event) => {
+  event.preventDefault();
+  const token = $('shared-token').value.trim();
+  if (!token) return;
+  const button = $('admin-login-button');
+  button.disabled = true;
+  const status = $('admin-login-status');
+  status.textContent = '驗證權杖中…';
+  try {
+    const headers = {Authorization:'Bearer ' + token, Accept:'application/vnd.github+json'};
+    const request = {headers,cache:'no-store',signal:AbortSignal.timeout(12000)};
+    const account = await fetch('https://api.github.com/user',request);
+    if (!account.ok) throw new Error('權杖驗證失敗，請確認是否有效。');
+    const repository = await fetch('https://api.github.com/repos/chllan/flower',request);
+    if (!repository.ok || (await repository.json()).permissions?.push === false) {
+      throw new Error('這組權杖無法管理 chllan/flower，請確認專案授權。');
+    }
+    adminToken = token;
+    $('shared-token').value = '';
+    status.textContent = '已登入管理模式。';
+    updateAdminView();
+  } catch (error) {
+    status.textContent = error.message || '無法驗證權杖，請稍後再試。';
+  } finally {
+    button.disabled = false;
+  }
+};
+$('admin-logout').onclick = () => {
+  adminToken = '';
+  $('shared-token').value = '';
+  $('admin-login-status').textContent = '已登出。';
+  updateAdminView();
+};
 
 const sharedApi = 'https://api.github.com/repos/chllan/flower/contents/flower-shared-data.json';
 const emptyShared = () => ({version:1, records:[], replacedFriends:[], flowerRenames:new Map()});
@@ -651,8 +705,8 @@ function encodeShared(data) {
 }
 
 async function publishRecords(extra = [], edit) {
-  const token = $('shared-token').value.trim();
-  if (!token) throw new Error('請先在「管理共用花冊」輸入 GitHub 更新權杖。');
+  const token = adminToken;
+  if (!token) throw new Error('請先使用 GitHub 更新權杖登入。');
   if (sharedWriting) throw new Error('正在發布，請稍候。');
   sharedWriting = true;
   const publishButton = $('publish-shared');
@@ -703,6 +757,7 @@ async function publishRecords(extra = [], edit) {
 
 $('rename-flower-form').onsubmit = async event => {
   event.preventDefault();
+  if (!adminToken) return;
   const oldName = canonical($('old-flower-name').value);
   const newName = exact($('new-flower-name').value);
   const status = $('rename-flower-status');

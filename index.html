@@ -4,8 +4,8 @@
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="description" content="管理及查詢遊戲好友擁有的花種">
 <title>好友花種圖鑑</title>
-<link rel="stylesheet" href="./style.css"><script defer src="./seed.js"></script><script defer src="./app.js?v=flower-gallery-1"></script>
-<script defer src="./flower-cards.js?v=5"></script>
+<link rel="stylesheet" href="./style.css?v=cards-3"><script defer src="./seed.js"></script><script defer src="./app.js?v=flower-admin-3"></script>
+<script defer src="./flower-cards.js?v=aligned-6"></script>
 <style>
 .flower-card-button{display:inline-flex;vertical-align:middle;padding:0;margin:0 8px 0 0;border-radius:8px;overflow:hidden;background:#f1f6ee;line-height:0}
 .flower-card-button img{width:42px;height:42px;object-fit:cover}
@@ -24,14 +24,21 @@
 nav{flex-wrap:wrap}
 .flower-card-dialog:has(#card-edit:not([hidden])){width:min(460px,calc(100vw - 24px));max-height:90dvh;overflow:auto}
 #card-edit{text-align:left}
-#card-edit canvas{display:block;width:min(180px,100%);height:auto;margin:8px auto;border-radius:8px}
+#card-edit canvas{display:block;width:min(280px,100%);height:auto;margin:8px auto;border-radius:8px}
+#card-crop-preview{background:conic-gradient(#e7e4e0 25%,#f8f6f3 0 50%,#e7e4e0 0 75%,#f8f6f3 0) 0 0/20px 20px}
 #card-edit label{display:block;margin:8px 0}
 #card-edit input[type=range]{display:block;width:100%;margin:0}
 #card-edit .actions{margin-top:12px}
 #card-edit-status{min-height:1.5em;margin:6px 0}
-#gallery-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(135px,1fr));gap:12px}
-#gallery-grid button{display:grid;gap:6px;align-content:start;overflow-wrap:anywhere;padding:6px}
-#gallery-grid img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:6px;background:#f1f6ee}
+[hidden]{display:none!important}
+.gallery-filters{display:grid;grid-template-columns:2fr 1fr;gap:12px}
+#gallery-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px;margin-top:12px}
+#gallery-grid button{display:grid;grid-template-rows:1fr 2.6em 1.25em;gap:5px;aspect-ratio:4/5;min-width:0;padding:8px;overflow:hidden;text-align:center;background:#fff;border:1px solid #d7e4db;border-radius:12px}
+#gallery-grid button:hover,#gallery-grid button:focus-visible{border-color:#638876;background:#f5faf6}
+#gallery-grid img{width:100%;height:100%;min-height:0;object-fit:contain;border-radius:8px;background:#f1f6ee}
+#gallery-grid .gallery-name{align-self:center;line-height:1.25;overflow-wrap:anywhere}
+#gallery-grid .gallery-grade{font-size:.8rem;color:#42634e;line-height:1.2}
+@media(max-width:400px){#gallery-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}}
 </style>
 </head>
 <body>
@@ -40,20 +47,24 @@ nav{flex-wrap:wrap}
   <section class="intro"><h1>好友花種圖鑑</h1><p>查找好友的花種，或上傳遊戲截圖更新收藏。</p>
     <div class="stats"><div><strong id="friend-count">—</strong> 位好友</div><div><strong id="flower-count">—</strong> 個花種</div><div><strong id="record-count">—</strong> 筆持有紀錄</div></div>
   </section>
-  <nav aria-label="花冊功能"><button type="button" data-view="catalog" aria-current="page">花種總覽</button><button type="button" data-view="gallery">圖庫</button><button type="button" data-view="editor">新增／更新好友</button></nav>
+  <nav aria-label="花冊功能"><button type="button" data-view="catalog" aria-current="page">花種收藏</button><button type="button" data-view="gallery">圖庫</button><button type="button" data-view="editor" data-admin hidden>新增／更新好友</button></nav>
   <div class="actions" style="margin-bottom:14px">
     <button type="button" id="export-backup">匯出好友備份</button>
-    <button type="button" id="import-backup">匯入好友備份</button>
+    <button type="button" id="import-backup" data-admin hidden>匯入好友備份</button>
     <input type="file" id="backup-file" accept=".json,application/json" hidden>
   </div>
-  <details style="margin:12px 0">
-    <summary>管理共用花冊</summary>
+  <details id="admin-panel" style="margin:12px 0">
+    <summary>管理員登入</summary>
+    <form id="admin-login">
     <label>GitHub 更新權杖<input id="shared-token" type="password" autocomplete="off" autocapitalize="off" spellcheck="false"></label>
-    <p>發布後，任何持有網站網址的人都可查看好友暱稱與花種。權杖只用於本頁更新時。</p>
-    <button id="publish-shared" type="button">發布目前好友資料</button>
+    <button id="admin-login-button" type="submit">登入</button>
+    </form>
+    <p id="admin-login-status" role="status"></p>
+    <button id="admin-logout" data-admin hidden type="button">登出</button>
+    <button id="publish-shared" data-admin hidden type="button">發布目前好友資料</button>
     <p id="shared-admin-status" role="status"></p>
   </details>
-  <details style="margin:12px 0">
+  <details data-admin hidden style="margin:12px 0">
     <summary>統一更正花名</summary>
     <form id="rename-flower-form">
       <div class="tools">
@@ -72,17 +83,24 @@ nav{flex-wrap:wrap}
     <div class="tools">
       <label>搜尋花名<input id="search" type="search" placeholder="例如：滿天星"></label>
       <label>篩選好友<select id="filter"><option value="">所有好友</option></select></label>
-      <label>顯示方式<select id="layout"><option value="list">持有人清單</option><option value="matrix">好友持有矩陣</option></select></label>
+      <label>品級<select id="catalog-grade"><option value="">全部品級</option><option>仙品</option><option>華品</option><option>珍品</option><option>普通</option><option>凡品</option><option value="ungraded">未分類</option></select></label>
+      <label>顯示方式<select id="layout"><option value="cards">收藏卡片</option><option value="list">持有人清單</option><option value="matrix">好友持有矩陣</option></select></label>
     </div>
+    <label class="owned-filter"><input id="catalog-owned" type="checkbox" checked> 只顯示已收藏花種</label>
+    <h2 class="catalog-heading">花種擁有者查詢</h2>
     <div class="results"><p id="summary"></p><div class="pages"><button id="prev" type="button">上一頁</button><span id="page-number"></span><button id="next" type="button">下一頁</button></div></div>
+    <div id="catalog-cards" class="flower-grid" hidden></div>
     <div class="table-frame" tabindex="0" aria-label="花種及好友持有紀錄"><table id="inventory"></table></div>
   </section>
   <section id="gallery" class="page" hidden aria-label="花朵圖庫">
-    <label>搜尋圖卡<input id="gallery-search" type="search" placeholder="輸入花名"></label>
+    <div class="gallery-filters">
+      <label>搜尋圖卡<input id="gallery-search" type="search" placeholder="輸入花名"></label>
+      <label>花朵品級<select id="gallery-grade"><option value="">全部品級</option><option>仙品</option><option>華品</option><option>珍品</option><option>普通</option><option>凡品</option><option value="ungraded">未分類</option></select></label>
+    </div>
     <div class="results"><p id="gallery-count" aria-live="polite"></p>
       <div class="pages"><button id="gallery-prev" type="button">上一頁</button><span id="gallery-page"></span><button id="gallery-next" type="button">下一頁</button></div>
     </div>
-    <button id="gallery-upload" type="button">新增／更換圖卡</button>
+    <button id="gallery-upload" data-admin hidden type="button">新增／更換圖卡</button>
     <div id="gallery-grid"></div>
   </section>
   <section id="editor" class="page" hidden>
@@ -132,12 +150,16 @@ nav{flex-wrap:wrap}
             <option value="6">左下</option><option value="7">下中</option><option value="8">右下</option>
           </select>
         </label>
-        <canvas id="card-crop-preview" width="320" height="320" role="img" aria-label="裁切預覽"></canvas>
+        <canvas id="card-crop-preview" width="768" height="768" role="img" aria-label="發布前預覽"></canvas>
         <label>左右 <input id="card-crop-x" type="range" min="-100" max="100" value="0"></label>
         <label>上下 <input id="card-crop-y" type="range" min="-100" max="100" value="0"></label>
         <label>放大 <input id="card-crop-zoom" type="range" min="75" max="250" value="100"></label>
+        <label><input id="card-remove-bg" type="checkbox" checked> 自動去背</label>
+        <label><input id="card-remove-stars" type="checkbox" checked> 去掉上方星星</label>
+        <label id="card-star-trim-field">星星殘留時，調整上緣去除範圍 <output id="card-star-value">0%</output>
+          <input id="card-star-trim" type="range" min="0" max="35" value="0">
+        </label>
       </div>
-      <label id="card-edit-token-field">GitHub 更新權杖 <input id="card-edit-token" type="password" autocomplete="off"></label>
       <p id="card-edit-status" role="status"></p>
       <div class="actions">
         <button id="card-edit-save" type="submit" disabled>儲存並發布</button>
