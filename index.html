@@ -4,8 +4,8 @@
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="description" content="管理及查詢遊戲好友擁有的花種">
 <title>好友花種圖鑑</title>
-<link rel="stylesheet" href="./style.css"><script defer src="./seed.js"></script><script defer src="./app.js?v=friend-management-1"></script>
-<script defer src="./flower-cards.js"></script>
+<link rel="stylesheet" href="./style.css"><script defer src="./seed.js"></script><script defer src="./app.js?v=flower-gallery-1"></script>
+<script defer src="./flower-cards.js?v=3"></script>
 <style>
 .flower-card-button{display:inline-flex;vertical-align:middle;padding:0;margin:0 8px 0 0;border-radius:8px;overflow:hidden;background:#f1f6ee;line-height:0}
 .flower-card-button img{width:42px;height:42px;object-fit:cover}
@@ -21,6 +21,10 @@
 .friend-management li button{flex-shrink:0}
 .friend-management button.danger{color:#9c302c}
 #friend-management-status:empty{display:none}
+nav{flex-wrap:wrap}
+#gallery-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(135px,1fr));gap:12px}
+#gallery-grid button{display:grid;gap:6px;align-content:start;overflow-wrap:anywhere;padding:6px}
+#gallery-grid img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:6px;background:#f1f6ee}
 </style>
 </head>
 <body>
@@ -29,7 +33,7 @@
   <section class="intro"><h1>好友花種圖鑑</h1><p>查找好友的花種，或上傳遊戲截圖更新收藏。</p>
     <div class="stats"><div><strong id="friend-count">—</strong> 位好友</div><div><strong id="flower-count">—</strong> 個花種</div><div><strong id="record-count">—</strong> 筆持有紀錄</div></div>
   </section>
-  <nav aria-label="花冊功能"><button type="button" data-view="catalog" aria-current="page">花種總覽</button><button type="button" data-view="editor">新增／更新好友</button></nav>
+  <nav aria-label="花冊功能"><button type="button" data-view="catalog" aria-current="page">花種總覽</button><button type="button" data-view="gallery">圖庫</button><button type="button" data-view="editor">新增／更新好友</button></nav>
   <div class="actions" style="margin-bottom:14px">
     <button type="button" id="export-backup">匯出好友備份</button>
     <button type="button" id="import-backup">匯入好友備份</button>
@@ -42,6 +46,19 @@
     <button id="publish-shared" type="button">發布目前好友資料</button>
     <p id="shared-admin-status" role="status"></p>
   </details>
+  <details style="margin:12px 0">
+    <summary>統一更正花名</summary>
+    <form id="rename-flower-form">
+      <div class="tools">
+        <label>原花名<input id="old-flower-name" list="rename-flower-options" maxlength="80" required></label>
+        <label>正確花名<input id="new-flower-name" list="rename-flower-options" maxlength="80" required></label>
+      </div>
+      <datalist id="rename-flower-options"></datalist>
+      <p>更正會套用到圖鑑、圖卡與所有好友。若正確花名已存在，重複的持有紀錄會合併。</p>
+      <button id="save-flower-name" type="submit">儲存共用花名</button>
+      <p id="rename-flower-status" role="status"></p>
+    </form>
+  </details>
   <p id="shared-status" role="status"></p>
   <p id="connection" role="status">正在載入花冊…</p>
   <section id="catalog" class="page" hidden>
@@ -52,6 +69,13 @@
     </div>
     <div class="results"><p id="summary"></p><div class="pages"><button id="prev" type="button">上一頁</button><span id="page-number"></span><button id="next" type="button">下一頁</button></div></div>
     <div class="table-frame" tabindex="0" aria-label="花種及好友持有紀錄"><table id="inventory"></table></div>
+  </section>
+  <section id="gallery" class="page" hidden aria-label="花朵圖庫">
+    <label>搜尋圖卡<input id="gallery-search" type="search" placeholder="輸入花名"></label>
+    <div class="results"><p id="gallery-count" aria-live="polite"></p>
+      <div class="pages"><button id="gallery-prev" type="button">上一頁</button><span id="gallery-page"></span><button id="gallery-next" type="button">下一頁</button></div>
+    </div>
+    <div id="gallery-grid"></div>
   </section>
   <section id="editor" class="page" hidden>
     <form id="entry">

@@ -22,8 +22,15 @@ const renameInput = $('rename-friend');
 const managementStatus = $('friend-management-status');
 let managedFriend = '';
 
-function flowerAlias(name) {
-  return key(name) === '粉木槿花' ? '粉紅木槿花' : name;
+function flowerAlias(name, renames = sharedData.flowerRenames) {
+  const seen = new Set();
+  name = exact(name);
+  if (key(name) === '粉木槿花' && !renames.has(name)) name = '粉紅木槿花';
+  while (renames.has(name) && !seen.has(name)) {
+    seen.add(name);
+    name = renames.get(name);
+  }
+  return name;
 }
 function canonical(name) {
   name = flowerAlias(name);
@@ -44,6 +51,10 @@ function merge(friend, names) {
 }
 function refresh() {
   nameLookup = new Map([...flowers.keys()].map(name => [key(name), name]));
+  for (const name of sharedData.flowerRenames.keys()) {
+    if (!nameLookup.has(key(name))) nameLookup.set(key(name), flowerAlias(name));
+  }
+  $('rename-flower-options').replaceChildren(...[...flowers.keys()].map(name => new Option(name)));
   $('friend-count').textContent = friends.length;
   $('flower-count').textContent = flowers.size;
   $('record-count').textContent = [...flowers.values()].reduce((sum,f) => sum + f.owners.size, 0).toLocaleString('zh-TW');
@@ -61,13 +72,19 @@ function show(next) {
   }
   $('catalog').hidden = view !== 'catalog';
   $('editor').hidden = view !== 'editor';
+  $('gallery').hidden = view !== 'gallery';
+  document.dispatchEvent(new Event('flower-catalog-updated'));
+}
+function flowerMatches(name, term) {
+  return key(name).includes(term) || [...sharedData.flowerRenames.keys()]
+    .some(old => flowerAlias(old) === name && key(old).includes(term));
 }
 function render() {
   const selected = filter.value;
   const term = key(search.value);
   const matrix = $('layout').value === 'matrix';
   const people = selected ? [selected] : friends;
-  const matches = [...flowers].filter(([name,f]) => key(name).includes(term) && (!selected || f.owners.has(selected)));
+  const matches = [...flowers].filter(([name,f]) => flowerMatches(name, term) && (!selected || f.owners.has(selected)));
   if (term) matches.sort(([a],[b]) => Number(key(b) === term)-Number(key(a) === term) || byName(a,b));
   const last = Math.max(1, Math.ceil(matches.length / size));
   page = Math.min(page,last);
@@ -457,7 +474,18 @@ function saveRecords(records) {
 }
 function load(message = '') {
   friends = [];
-  flowers = new Map(Object.entries(seed.flowers).map(([name,f]) => [name,{grade:f.grade,owners:new Set()}]));
+  flowers = new Map();
+  for (const [name, data] of Object.entries(seed.flowers)) {
+    const corrected = flowerAlias(name);
+    const existing = flowers.get(corrected);
+    if (!existing || name === corrected || !existing.grade) {
+      flowers.set(corrected, {grade:data.grade, owners:new Set()});
+    }
+  }
+  for (const name of sharedData.flowerRenames.values()) {
+    const corrected = flowerAlias(name);
+    if (!flowers.has(corrected)) flowers.set(corrected, {grade:'', owners:new Set()});
+  }
   try {
     for (const {friend,flower} of effectiveRecords(sharedData, readRecords())) merge(friend,[flower]);
     connection.textContent = message || (friends.length ? '' : '第一次使用時，可以匯入好友備份或新增好友。');
@@ -505,7 +533,8 @@ window.addEventListener('storage', event => {
 });
 
 const sharedApi = 'https://api.github.com/repos/chllan/flower/contents/flower-shared-data.json';
-let sharedData = {version:1, records:[], replacedFriends:[]};
+const emptyShared = () => ({version:1, records:[], replacedFriends:[], flowerRenames:new Map()});
+let sharedData = emptyShared();
 const seedRecords = [
   ...seed.friends.map(friend => ({friend, flower:''})),
   ...Object.entries(seed.flowers).flatMap(([flower, data]) =>
@@ -515,7 +544,22 @@ const seedRecords = [
 function effectiveRecords(data, local, extra = []) {
   const replaced = new Set(data.replacedFriends);
   const fallback = (row) => !replaced.has(exact(row.friend));
-  return combinedRecords(seedRecords.filter(fallback), data.records, local.filter(fallback), extra);
+  const records = combinedRecords(seedRecords.filter(fallback), data.records, local.filter(fallback), extra);
+  return combinedRecords(records.map(row => ({...row, flower:flowerAlias(row.flower, data.flowerRenames)})));
+}
+
+function applyFlowerRename(data, records, {oldName, newName}) {
+  if (flowerAlias(oldName, data.flowerRenames) !== oldName ||
+      (!Object.keys(seed.flowers).some(name => flowerAlias(name, data.flowerRenames) === oldName) &&
+       !records.some(row => row.flower === oldName) &&
+       ![...data.flowerRenames.values()].some(name => flowerAlias(name, data.flowerRenames) === oldName))) {
+    throw new Error('原花名已變更，請重新查詢。');
+  }
+  const target = flowerAlias(newName, data.flowerRenames);
+  const renames = new Map(data.flowerRenames);
+  if (target === oldName) renames.delete(newName);
+  renames.set(oldName, target === oldName ? newName : target);
+  return renames;
 }
 
 function applyFriendEdit(records, replacedFriends, {friend, newName, flower}) {
@@ -543,7 +587,7 @@ function combinedRecords(...sources) {
   const records = new Map();
   for (const source of sources) {
     for (const row of source) {
-      const normalized = {friend:exact(row.friend),flower:flowerAlias(exact(row.flower))};
+      const normalized = {friend:exact(row.friend),flower:exact(row.flower)};
       records.set(JSON.stringify([normalized.friend,normalized.flower]),normalized);
     }
   }
@@ -562,7 +606,13 @@ function parseShared(data) {
       replacedFriends.some(name => typeof name !== 'string' || !name.trim() || name.length > 80)) {
     throw new Error('共用資料的格式有誤。');
   }
-  return {version:1, records:data.records, replacedFriends:replacedFriends.map(exact)};
+  const entries = data.flowerRenames ?? [];
+  if (!Array.isArray(entries) || entries.some(pair => !Array.isArray(pair) || pair.length !== 2 ||
+      pair.some(name => typeof name !== 'string' || !name.trim() || name.length > 80))) {
+    throw new Error('共用花名的格式有誤。');
+  }
+  const flowerRenames = new Map(entries.map(pair => pair.map(exact)));
+  return {version:1, records:data.records, replacedFriends:replacedFriends.map(exact), flowerRenames};
 }
 
 async function refreshShared() {
@@ -579,7 +629,7 @@ async function refreshShared() {
     if (!response.ok) throw new Error();
     const data = parseShared(await response.json());
     if (revision !== sharedRevision || sharedWriting) return;
-    if (JSON.stringify(data) !== JSON.stringify(sharedData)) {
+    if (serializeShared(data) !== serializeShared(sharedData)) {
       sharedData = data;
       load();
       if (!$('review').hidden) classify();
@@ -590,8 +640,11 @@ async function refreshShared() {
   }
 }
 
+function serializeShared(data) {
+  return JSON.stringify({...data, flowerRenames:[...data.flowerRenames]});
+}
 function encodeShared(data) {
-  const bytes = new TextEncoder().encode(JSON.stringify(data));
+  const bytes = new TextEncoder().encode(serializeShared(data));
   let binary = '';
   for (const byte of bytes) binary += String.fromCharCode(byte);
   return btoa(binary);
@@ -608,7 +661,7 @@ async function publishRecords(extra = [], edit) {
   try {
     for (let attempt = 0; attempt < 2; attempt++) {
       const current = await fetch(sharedApi + '?ref=main', {headers,cache:'no-store',signal:AbortSignal.timeout(15000)});
-      let remote = {version:1, records:[], replacedFriends:[]};
+      let remote = emptyShared();
       let sha;
       if (current.ok) {
         const file = await current.json();
@@ -620,8 +673,13 @@ async function publishRecords(extra = [], edit) {
       }
       const replacedFriends = new Set(remote.replacedFriends);
       let records = effectiveRecords(remote, readRecords(), extra);
-      if (edit) records = applyFriendEdit(records, replacedFriends, edit);
-      const data = {version:1, records, replacedFriends:[...replacedFriends]};
+      const flowerRenames = edit?.oldName ? applyFlowerRename(remote, records, edit) : remote.flowerRenames;
+      if (edit?.friend) {
+        records = applyFriendEdit(records, replacedFriends,
+          {...edit, flower:edit.flower && flowerAlias(edit.flower, flowerRenames)});
+      }
+      const data = {version:1, records, replacedFriends:[...replacedFriends], flowerRenames};
+      if (edit?.oldName) data.records = effectiveRecords(data, []);
       const response = await fetch(sharedApi, {
         method:'PUT',
         headers:{...headers,'Content-Type':'application/json'},
@@ -642,6 +700,34 @@ async function publishRecords(extra = [], edit) {
     publishButton.disabled = false;
   }
 }
+
+$('rename-flower-form').onsubmit = async event => {
+  event.preventDefault();
+  const oldName = canonical($('old-flower-name').value);
+  const newName = exact($('new-flower-name').value);
+  const status = $('rename-flower-status');
+  if (!flowers.has(oldName) || !newName || oldName === newName) {
+    status.textContent = '請輸入現有花名和不同的正確花名。';
+    return;
+  }
+  if (!confirm('確定將共用花冊中的「' + oldName + '」更正為「' + newName + '」？')) return;
+  const button = $('save-flower-name');
+  button.disabled = true;
+  status.textContent = '正在儲存…';
+  try {
+    await publishRecords([], {oldName, newName});
+    search.value = flowerAlias(oldName);
+    page = 1;
+    load();
+    if (!$('review').hidden) classify();
+    event.target.reset();
+    status.textContent = '已更正為「' + flowerAlias(oldName) + '」，並更新所有好友的持有紀錄。';
+  } catch (error) {
+    status.textContent = error.message || '儲存失敗，請重試。';
+  } finally {
+    button.disabled = false;
+  }
+};
 
 $('publish-shared').onclick = async () => {
   const status = $('shared-admin-status');
