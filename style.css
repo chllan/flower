@@ -93,3 +93,11 @@ nav #export-backup{white-space:nowrap}
   nav[aria-label="花冊功能"]{gap:6px}
   nav[aria-label="花冊功能"] button{padding-inline:8px;font-size:clamp(.85rem,4vw,1rem)}
 }
+
+#catalog-cards,#gallery-grid{
+  max-height:64vh;
+  max-height:64dvh;
+  overflow-y:auto;
+  align-content:start;
+  padding:4px;
+}

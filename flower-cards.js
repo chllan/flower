@@ -385,13 +385,13 @@
     renderCollection();
   }
 
-  search.oninput = grade.onchange = () => { page = 1; renderGallery(); };
+  search.oninput = grade.onchange = () => { page = 1; grid.scrollTop = 0; renderGallery(); };
   document.addEventListener('flower-admin-updated', () => {
     change.hidden = !adminToken;
     if (!adminToken && dialog.open && !form.hidden && !publishing) dialog.close();
   });
-  prev.onclick = () => { page--; renderGallery(); };
-  next.onclick = () => { page++; renderGallery(); };
+  prev.onclick = () => { page--; renderGallery(); grid.scrollTop = 0; };
+  next.onclick = () => { page++; renderGallery(); grid.scrollTop = 0; };
   document.addEventListener('flower-catalog-updated', refreshCards);
   document.addEventListener('flower-collection-updated', renderCollection);
   new MutationObserver(addCards).observe(table, {childList:true});

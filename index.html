@@ -4,8 +4,8 @@
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="description" content="管理及查詢遊戲好友擁有的花種">
 <title>好友花種圖鑑</title>
-<link rel="stylesheet" href="./style.css?v=admin-mobile-13"><script defer src="./seed.js"></script><script defer src="./app.js?v=search-grade-14"></script>
-<script defer src="./flower-cards.js?v=search-grade-14"></script>
+<link rel="stylesheet" href="./style.css?v=ocr-scroll-15"><script defer src="./seed.js"></script><script defer src="./app.js?v=ocr-scroll-15"></script>
+<script defer src="./flower-cards.js?v=ocr-scroll-15"></script>
 <style>
 .flower-card-button{display:inline-flex;vertical-align:middle;padding:0;margin:0 8px 0 0;border-radius:8px;overflow:hidden;background:#f1f6ee;line-height:0}
 .flower-card-button img{width:42px;height:42px;object-fit:cover}
@@ -95,7 +95,7 @@ nav{flex-wrap:wrap}
     </div>
     <h2 class="catalog-heading">花種擁有者查詢</h2>
     <div class="results"><p id="summary"></p><div class="pages"><button id="prev" type="button">上一頁</button><span id="page-number"></span><button id="next" type="button">下一頁</button></div></div>
-    <div id="catalog-cards" class="flower-grid" hidden></div>
+    <div id="catalog-cards" class="flower-grid" tabindex="0" role="region" aria-label="花種卡片" hidden></div>
     <div class="table-frame" tabindex="0" aria-label="花種及好友持有紀錄"><table id="inventory"></table></div>
   </section>
   <section id="gallery" class="page" hidden aria-label="花朵圖庫">
@@ -107,7 +107,7 @@ nav{flex-wrap:wrap}
       <div class="pages"><button id="gallery-prev" type="button">上一頁</button><span id="gallery-page"></span><button id="gallery-next" type="button">下一頁</button></div>
     </div>
     <button id="gallery-upload" data-admin hidden type="button">新增／更換圖卡</button>
-    <div id="gallery-grid"></div>
+    <div id="gallery-grid" tabindex="0" role="region" aria-label="圖庫卡片"></div>
   </section>
   <section id="editor" class="page" hidden>
     <form id="entry">

@@ -190,10 +190,14 @@ function render() {
   }
   table.replaceChildren(head,body);
 }
+function resetCatalogScroll() {
+  $('catalog-cards').scrollTop = 0;
+  $('inventory').closest('.table-frame').scrollTop = 0;
+}
 function updateFilter() {
   page = 1;
   render();
-  document.querySelector('.table-frame').scrollTop = 0;
+  resetCatalogScroll();
 }
 function renderImages(id) {
   $(id).replaceChildren(...imageURLs.map((src,i) => {
@@ -251,6 +255,27 @@ function candidates(text) {
     return match ? [match] : [];
   });
 }
+function detailLabel(image, x, y, width, height, isWhite) {
+  const canvas = document.createElement('canvas');
+  const scale = 5;
+  const padding = 16;
+  canvas.width = width * scale + padding * 2;
+  canvas.height = height * scale + padding * 2;
+  const ctx = canvas.getContext('2d', {willReadFrequently:true});
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.drawImage(image, x * image.naturalWidth / 573, y * image.naturalHeight / 1280,
+    width * image.naturalWidth / 573, height * image.naturalHeight / 1280,
+    padding, padding, width * scale, height * scale);
+  const crop = ctx.getImageData(padding, padding, width * scale, height * scale);
+  for (let i = 0; i < crop.data.length; i += 4) {
+    const [r, g, b] = [crop.data[i], crop.data[i+1], crop.data[i+2]];
+    const ink = isWhite ? Math.min(r, g, b) > 190 : r - b > 32 && b < 158 && r - g > 22;
+    crop.data[i] = crop.data[i+1] = crop.data[i+2] = ink ? 0 : 255;
+  }
+  ctx.putImageData(crop, padding, padding);
+  return canvas;
+}
 async function screenshotLabels(file) {
   const url = URL.createObjectURL(file);
   try {
@@ -258,7 +283,12 @@ async function screenshotLabels(file) {
     image.src = url;
     await image.decode();
     const ratio = image.naturalWidth / image.naturalHeight;
-    if (ratio < 0.44 || ratio > 0.48) return null;
+    if (ratio < 0.40 || ratio > 0.55) return {details:[], grid:[]};
+    const details = [
+      detailLabel(image, 218, 181, 137, 27, true),
+      detailLabel(image, 273, 937, 162, 36, false)
+    ];
+    if (ratio < 0.44 || ratio > 0.48) return {details, grid:[]};
     // Find the lower edge of the brown sort selector to align both layouts.
     const guide = document.createElement('canvas');
     guide.width = 1;
@@ -317,7 +347,7 @@ async function screenshotLabels(file) {
         labels.push(label);
       }
     }
-    return labels;
+    return {details, grid:labels};
   } finally {
     URL.revokeObjectURL(url);
   }
@@ -339,12 +369,26 @@ async function recognize(files) {
     for (const [i,file] of files.entries()) {
       $('progress').textContent = '正在辨識第 ' + (i+1) + ' / ' + files.length + ' 張截圖…';
       try {
-        const labels = await screenshotLabels(file);
-        await worker.setParameters({tessedit_pageseg_mode:labels ? '7' : '11'});
-        for (const input of labels || [file]) {
-          const {data} = await worker.recognize(input);
-          results.push(data.text);
+        const {details, grid} = await screenshotLabels(file);
+        const raw = [];
+        await worker.setParameters({tessedit_pageseg_mode:'7'});
+        for (const label of details) {
+          const {data} = await worker.recognize(label);
+          raw.push(data.text);
+          if (candidates(data.text).length) break;
         }
+        if (!candidates(raw.join('\n')).length) {
+          for (const label of grid) {
+            const {data} = await worker.recognize(label);
+            raw.push(data.text);
+          }
+          if (!candidates(raw.join('\n')).length) {
+            await worker.setParameters({tessedit_pageseg_mode:'11'});
+            const {data} = await worker.recognize(file);
+            raw.push(data.text);
+          }
+        }
+        results.push(raw.join('\n'));
       } catch {failed++;}
     }
     return {text:results.join('\n'), failed};
@@ -368,8 +412,8 @@ friendFilterSearch.onkeydown = event => {
 };
 initializeGradeButtons('catalog-grade');
 initializeGradeButtons('gallery-grade');
-$('prev').onclick = () => {page--; render(); document.querySelector('.table-frame').scrollTop = 0;};
-$('next').onclick = () => {page++; render(); document.querySelector('.table-frame').scrollTop = 0;};
+$('prev').onclick = () => {page--; render(); resetCatalogScroll();};
+$('next').onclick = () => {page++; render(); resetCatalogScroll();};
 function updateFriendManagement() {
   const friend = friendSelect.value;
   $('new-field').hidden = Boolean(friend);
