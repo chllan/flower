@@ -4,8 +4,8 @@
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="description" content="管理及查詢遊戲好友擁有的花種">
 <title>好友花種圖鑑</title>
-<link rel="stylesheet" href="./style.css?v=cards-3"><script defer src="./seed.js"></script><script defer src="./app.js?v=flower-admin-3"></script>
-<script defer src="./flower-cards.js?v=aligned-6"></script>
+<link rel="stylesheet" href="./style.css?v=grade-8"><script defer src="./seed.js"></script><script defer src="./app.js?v=flower-admin-3"></script>
+<script defer src="./flower-cards.js?v=grade-8"></script>
 <style>
 .flower-card-button{display:inline-flex;vertical-align:middle;padding:0;margin:0 8px 0 0;border-radius:8px;overflow:hidden;background:#f1f6ee;line-height:0}
 .flower-card-button img{width:42px;height:42px;object-fit:cover}
@@ -33,11 +33,11 @@ nav{flex-wrap:wrap}
 [hidden]{display:none!important}
 .gallery-filters{display:grid;grid-template-columns:2fr 1fr;gap:12px}
 #gallery-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px;margin-top:12px}
-#gallery-grid button{display:grid;grid-template-rows:1fr 2.6em 1.25em;gap:5px;aspect-ratio:4/5;min-width:0;padding:8px;overflow:hidden;text-align:center;background:#fff;border:1px solid #d7e4db;border-radius:12px}
+#gallery-grid button{display:grid;grid-template-rows:auto 1fr auto;gap:5px;min-width:0;padding:8px;text-align:center;background:#fff;border:1px solid var(--grade-border,#d7e4db);border-radius:12px}
 #gallery-grid button:hover,#gallery-grid button:focus-visible{border-color:#638876;background:#f5faf6}
-#gallery-grid img{width:100%;height:100%;min-height:0;object-fit:contain;border-radius:8px;background:#f1f6ee}
+#gallery-grid img{width:100%;height:auto;aspect-ratio:1;object-fit:contain;border-radius:8px;background:var(--grade-bg,#f1f6ee)}
 #gallery-grid .gallery-name{align-self:center;line-height:1.25;overflow-wrap:anywhere}
-#gallery-grid .gallery-grade{font-size:.8rem;color:#42634e;line-height:1.2}
+#gallery-grid .gallery-grade{font-size:.8rem;line-height:1.25}
 @media(max-width:400px){#gallery-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}}
 </style>
 </head>
@@ -154,10 +154,9 @@ nav{flex-wrap:wrap}
         <label>左右 <input id="card-crop-x" type="range" min="-100" max="100" value="0"></label>
         <label>上下 <input id="card-crop-y" type="range" min="-100" max="100" value="0"></label>
         <label>放大 <input id="card-crop-zoom" type="range" min="75" max="250" value="100"></label>
-        <label><input id="card-remove-bg" type="checkbox" checked> 自動去背</label>
         <label><input id="card-remove-stars" type="checkbox" checked> 去掉上方星星</label>
-        <label id="card-star-trim-field">星星殘留時，調整上緣去除範圍 <output id="card-star-value">0%</output>
-          <input id="card-star-trim" type="range" min="0" max="35" value="0">
+        <label id="card-star-trim-field">去星星裁切幅度 <output id="card-star-value">6%</output>
+          <input id="card-star-trim" type="range" min="0" max="35" value="6">
         </label>
       </div>
       <p id="card-edit-status" role="status"></p>
