@@ -69,3 +69,18 @@ body{background:#f7f4ee}
   #catalog .tools>label:first-child,.gallery-filters>label:first-child{grid-column:1/-1}
   .grade-filter{grid-row:auto}
 }
+
+/* Compact collection filters and scrollable owner names */
+#catalog .tools{grid-template-columns:1fr;gap:10px;padding:12px}
+#catalog .tools .grade-filter{grid-row:auto}
+.friend-filter{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-items:end;column-gap:10px}
+.friend-filter label{min-width:0}
+.friend-filter label+label{margin-top:0}
+.friend-filter input,.friend-filter select,.catalog-view-options select{font-size:1rem}
+.friend-filter [role="status"]{grid-column:1/-1}
+.catalog-view-options{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-items:end;gap:10px;margin-top:10px}
+.catalog-view-options .owned-filter{min-height:44px;margin:0;font-size:.88rem}
+.catalog-heading{margin-top:14px}
+.collection-owners{height:4.5rem;overflow:auto;overscroll-behavior-y:contain;scrollbar-width:thin}
+.collection-owners ul{list-style:none;margin:0;padding:0 2px 1px 0;display:flex;flex-wrap:wrap;gap:4px}
+.collection-owners li{max-width:100%;padding:3px 7px;border-radius:5px;background:var(--grade-bg,#eaf3e8);color:var(--grade-ink,#244335);font-size:.82rem;line-height:1.3;overflow-wrap:anywhere}

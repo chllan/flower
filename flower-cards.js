@@ -325,12 +325,23 @@
       const grade = document.createElement('span');
       grade.className = 'gallery-grade';
       grade.textContent = flower.grade || '未分類';
-      const owners = document.createElement('p');
+      const owners = document.createElement('div');
       owners.className = 'collection-owners';
       const ownerNames = [...flower.owners];
-      owners.textContent = !ownerNames.length ? '目前無人收藏' :
-        ownerNames.length <= 2 ? '擁有者：' + ownerNames.join('、') :
-        ownerNames.length + ' 位擁有者 · 點圖查看';
+      if (!ownerNames.length) {
+        owners.textContent = '目前無人收藏';
+      } else {
+        owners.tabIndex = 0;
+        owners.setAttribute('role','region');
+        owners.setAttribute('aria-label', name + '的擁有者，共 ' + ownerNames.length + ' 位');
+        const list = document.createElement('ul');
+        for (const person of ownerNames) {
+          const chip = document.createElement('li');
+          chip.textContent = person;
+          list.append(chip);
+        }
+        owners.append(list);
+      }
       item.append(picture,heading,grade,owners);
       return item;
     }));

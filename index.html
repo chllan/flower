@@ -4,8 +4,8 @@
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="description" content="管理及查詢遊戲好友擁有的花種">
 <title>好友花種圖鑑</title>
-<link rel="stylesheet" href="./style.css?v=soft-9"><script defer src="./seed.js"></script><script defer src="./app.js?v=soft-9"></script>
-<script defer src="./flower-cards.js?v=grade-8"></script>
+<link rel="stylesheet" href="./style.css?v=compact-10"><script defer src="./seed.js"></script><script defer src="./app.js?v=soft-9"></script>
+<script defer src="./flower-cards.js?v=compact-10"></script>
 <style>
 .flower-card-button{display:inline-flex;vertical-align:middle;padding:0;margin:0 8px 0 0;border-radius:8px;overflow:hidden;background:#f1f6ee;line-height:0}
 .flower-card-button img{width:42px;height:42px;object-fit:cover}
@@ -88,9 +88,11 @@ nav{flex-wrap:wrap}
         <span id="friend-filter-status" role="status"></span>
       </div>
       <div class="grade-filter"><span id="catalog-grade-label">品級</span><select aria-labelledby="catalog-grade-label" id="catalog-grade"><option value="">全部品級</option><option>仙品</option><option>華品</option><option>珍品</option><option>普通</option><option>凡品</option><option value="ungraded">未分類</option></select><div class="grade-options" role="group" aria-labelledby="catalog-grade-label" hidden></div></div>
-      <label>顯示方式<select id="layout"><option value="cards">收藏卡片</option><option value="list">持有人清單</option><option value="matrix">好友持有矩陣</option></select></label>
     </div>
-    <label class="owned-filter"><input id="catalog-owned" type="checkbox" checked> 只顯示已收藏花種</label>
+    <div class="catalog-view-options">
+      <label>顯示方式<select id="layout"><option value="cards">收藏卡片</option><option value="list">持有人清單</option><option value="matrix">好友持有矩陣</option></select></label>
+      <label class="owned-filter"><input id="catalog-owned" type="checkbox" checked> 只顯示已收藏花種</label>
+    </div>
     <h2 class="catalog-heading">花種擁有者查詢</h2>
     <div class="results"><p id="summary"></p><div class="pages"><button id="prev" type="button">上一頁</button><span id="page-number"></span><button id="next" type="button">下一頁</button></div></div>
     <div id="catalog-cards" class="flower-grid" hidden></div>
