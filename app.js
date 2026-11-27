@@ -10,7 +10,7 @@ const exact = value => value.normalize('NFC').trim();
 const key = value => value.normalize('NFKC').toLowerCase().replace(/[\s·・‧．]/gu, '');
 const byName = new Intl.Collator('zh-Hant').compare;
 const split = text => text.split(/[\n、，,；;]+/u).map(exact).filter(Boolean);
-const size = 35;
+const size = 50;
 let friends = [], flowers = new Map(), nameLookup = new Map(), imageURLs = [], view = 'catalog', page = 1, target = '', saving = false;
 let ocrLibrary, ready = false;
 const connection = $('connection');

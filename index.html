@@ -4,8 +4,8 @@
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="description" content="管理及查詢遊戲好友擁有的花種">
 <title>好友花種圖鑑</title>
-<link rel="stylesheet" href="./style.css?v=compact-10"><script defer src="./seed.js"></script><script defer src="./app.js?v=soft-9"></script>
-<script defer src="./flower-cards.js?v=compact-10"></script>
+<link rel="stylesheet" href="./style.css?v=friend-order-11"><script defer src="./seed.js"></script><script defer src="./app.js?v=page-50"></script>
+<script defer src="./flower-cards.js?v=page-50"></script>
 <style>
 .flower-card-button{display:inline-flex;vertical-align:middle;padding:0;margin:0 8px 0 0;border-radius:8px;overflow:hidden;background:#f1f6ee;line-height:0}
 .flower-card-button img{width:42px;height:42px;object-fit:cover}
@@ -47,9 +47,8 @@ nav{flex-wrap:wrap}
   <section class="intro"><h1>好友花種圖鑑</h1><p>查找好友的花種，或上傳遊戲截圖更新收藏。</p>
     <div class="stats"><div><strong id="friend-count">—</strong> 位好友</div><div><strong id="flower-count">—</strong> 個花種</div><div><strong id="record-count">—</strong> 筆持有紀錄</div></div>
   </section>
-  <nav aria-label="花冊功能"><button type="button" data-view="catalog" aria-current="page">花種收藏</button><button type="button" data-view="gallery">圖庫</button><button type="button" data-view="editor" data-admin hidden>新增／更新好友</button></nav>
-  <div class="actions" style="margin-bottom:14px">
-    <button type="button" id="export-backup">匯出好友備份</button>
+  <nav aria-label="花冊功能"><button type="button" data-view="catalog" aria-current="page">花種收藏</button><button type="button" data-view="gallery">圖庫</button><button type="button" id="export-backup">匯出好友備份</button><button type="button" data-view="editor" data-admin hidden>新增／更新好友</button></nav>
+  <div class="actions backup-import">
     <button type="button" id="import-backup" data-admin hidden>匯入好友備份</button>
     <input type="file" id="backup-file" accept=".json,application/json" hidden>
   </div>
@@ -83,8 +82,8 @@ nav{flex-wrap:wrap}
     <div class="tools">
       <label>搜尋花名<input id="search" type="search" placeholder="例如：滿天星"></label>
       <div class="friend-filter">
-        <label>搜尋好友名字<input id="friend-filter-search" type="search" placeholder="輸入部分名字" autocomplete="off"></label>
-        <label>篩選好友<select id="filter"><option value="">所有好友</option></select></label>
+        <label>選擇好友<select id="filter"><option value="">所有好友</option></select></label>
+        <label>搜尋好友<input id="friend-filter-search" type="search" placeholder="輸入部分名字" autocomplete="off"></label>
         <span id="friend-filter-status" role="status"></span>
       </div>
       <div class="grade-filter"><span id="catalog-grade-label">品級</span><select aria-labelledby="catalog-grade-label" id="catalog-grade"><option value="">全部品級</option><option>仙品</option><option>華品</option><option>珍品</option><option>普通</option><option>凡品</option><option value="ungraded">未分類</option></select><div class="grade-options" role="group" aria-labelledby="catalog-grade-label" hidden></div></div>

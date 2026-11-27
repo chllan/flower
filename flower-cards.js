@@ -10,7 +10,7 @@
   const grade = document.getElementById('gallery-grade');
   const prev = document.getElementById('gallery-prev');
   const next = document.getElementById('gallery-next');
-  const pageSize = 36;
+  const pageSize = 50;
   let page = 1;
   let cards = new Map();
 
